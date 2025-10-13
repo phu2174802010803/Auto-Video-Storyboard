@@ -11,6 +11,55 @@ const isDev = !app.isPackaged;
 // Flow automation global stop flag
 let stopFlowAutomation = false;
 
+// ============================================
+// UTILITY: Rate Limit Retry Handler
+// ============================================
+
+/**
+ * Retry function with exponential backoff for rate limit errors
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @param {number} initialDelay - Initial delay in ms (default: 2000)
+ * @returns {Promise} - Result of successful function call
+ */
+async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            
+            // Check if it's a rate limit error (429)
+            const isRateLimitError = 
+                error.message?.includes('429') || 
+                error.message?.includes('Too Many Requests') ||
+                error.message?.includes('quota') ||
+                error.message?.includes('rate limit');
+            
+            if (!isRateLimitError) {
+                // Not a rate limit error, throw immediately
+                throw error;
+            }
+            
+            // If this was the last attempt, throw
+            if (attempt === maxRetries) {
+                throw new Error(`Rate limit exceeded after ${maxRetries + 1} attempts. Please wait 1 minute and try again, or upgrade your Gemini API plan. Details: ${error.message}`);
+            }
+            
+            // Calculate delay with exponential backoff
+            const delay = initialDelay * Math.pow(2, attempt);
+            console.log(`⏳ Rate limit hit. Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries + 1})`);
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    
+    throw lastError;
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -169,7 +218,10 @@ ${analysisContent}
 
 Format: Markdown với emoji, rõ ràng, dễ đọc. Phân tích đầy đủ, chi tiết.`;
 
-        const analysisResult = await model.generateContent(prompt);
+        // Use retry logic for rate limit handling
+        const analysisResult = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        }, 3, 2000);
         const analysisResponse = await analysisResult.response;
         const analysisText = analysisResponse.text();
 
@@ -422,7 +474,10 @@ Hãy tạo storyboard theo ĐÚNG format trên!`;
 
         event.sender.send('progress-update', { progress: 30, status: 'Đang gửi yêu cầu tới AI...' });
 
-        const result = await model.generateContent(prompt);
+        // Use retry logic for rate limit handling
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        }, 3, 2000); // Max 3 retries, starting with 2s delay
 
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý phản hồi từ AI...' });
 
@@ -634,7 +689,10 @@ Hãy tạo storyboard theo ĐÚNG format CHUẨN trên!`;
 
         event.sender.send('progress-update', { progress: 35, status: 'Đang phân tích nội dung...' });
 
-        const result = await model.generateContent(prompt);
+        // Use retry logic for rate limit handling
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        }, 3, 2000);
 
         event.sender.send('progress-update', { progress: 75, status: 'Đang tạo storyboard từ nội dung...' });
 
@@ -990,7 +1048,10 @@ TTS Script (LONG, DETAILED, COMPREHENSIVE):
 
         event.sender.send('progress-update', { progress: 25, status: `Đang tạo ${numPrompts} prompt video...` });
 
-        const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        // Use retry logic for rate limit handling
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        }, 3, 2000);
 
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý và format prompts...' });
 
