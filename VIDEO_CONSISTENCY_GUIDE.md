@@ -11,33 +11,87 @@ Hệ thống tạo video prompts đã được nâng cấp với **4 control sys
 ### Mục đích
 Giúp nhân vật giữ nguyên khuôn mặt, kiểu tóc, trang phục giữa các cảnh/video.
 
-### Cấu trúc trong SETTING CHUNG
+### Cấu trúc trong SETTING CHUNG (Chi tiết đầy đủ)
 
 ```
 Character consistency control:
   Nam:
-    reference_tag: "Nam_THS_uniform"
-    face_embedding: fixed
-    outfit: "white shirt, navy pants, red scarf"
-    hairstyle: "short black hair, neat student cut"
-    tone: "natural warm skin tone"
-    physical_traits: "average height, slim build, friendly expression"
+    reference_tag: "Nam_student_grade7_consistent"
+    
+    age: "12 years old"
+    
+    facial_features:
+      face_shape: "round, soft youthful features"
+      eyes: "dark brown eyes, large and bright, expressive"
+      nose: "small button nose"
+      mouth: "wide cheerful smile, natural Vietnamese features"
+      skin_tone: "light warm Vietnamese skin tone"
+      distinctive_marks: "small dimple on left cheek when smiling"
+    
+    hair:
+      style: "short neat cut, typical Vietnamese student"
+      color: "black hair"
+      texture: "straight, slightly thick"
+      details: "neatly combed, side part"
+    
+    body:
+      height: "average for age, around 145cm"
+      build: "slim, youthful athletic build"
+      posture: "confident, curious stance"
+    
+    outfit:
+      top: "white school uniform shirt, short sleeves"
+      bottom: "navy blue pants, cotton fabric"
+      accessories: "red scarf tied at neck, small school badge"
+      shoes: "white sneakers with navy trim"
+    
+    personality_expression:
+      default_emotion: "cheerful, curious, engaged"
+      energy_level: "high, enthusiastic student"
+      signature_gesture: "raises hand when excited, points at math problems"
+    
+    animation_style: "Pixar-inspired 3D semi-realistic, expressive eyes, natural body language"
+    
+    render_instruction: "Keep this EXACT design in EVERY scene - same face proportions, same hair, same outfit, same smile, same energy"
     
   Hoa:
-    reference_tag: "Hoa_THS_uniform"
-    face_embedding: fixed
-    outfit: "white shirt, navy skirt, red scarf"
-    hairstyle: "shoulder-length black hair with bangs"
-    tone: "natural warm skin tone"
-    physical_traits: "petite, cheerful demeanor"
+    reference_tag: "Hoa_student_grade7_consistent"
     
-  ThayBac:
-    reference_tag: "ThayBac_teacher"
-    face_embedding: fixed
-    outfit: "light blue shirt, dark trousers"
-    hairstyle: "short black hair, neat professional style"
-    tone: "natural warm skin tone"
-    physical_traits: "tall, confident posture, glasses"
+    age: "12 years old"
+    
+    facial_features:
+      face_shape: "oval, delicate feminine features"
+      eyes: "soft brown eyes, medium size, gentle expression"
+      nose: "small refined nose"
+      mouth: "gentle friendly smile, dimples on both sides"
+      skin_tone: "light warm Vietnamese skin tone"
+      distinctive_marks: "natural rosy cheeks"
+    
+    hair:
+      style: "shoulder-length, neat student style"
+      color: "black hair"
+      texture: "straight, silky"
+      details: "bangs covering forehead, tied with small ribbon"
+    
+    body:
+      height: "petite for age, around 140cm"
+      build: "slim, graceful posture"
+      posture: "relaxed, friendly demeanor"
+    
+    outfit:
+      top: "white school uniform shirt, short sleeves"
+      bottom: "navy blue skirt, knee-length"
+      accessories: "red scarf tied at neck, small school badge, hair ribbon"
+      shoes: "white school shoes with navy socks"
+    
+    personality_expression:
+      default_emotion: "gentle, thoughtful, helpful"
+      energy_level: "moderate, calm confidence"
+      signature_gesture: "tucks hair behind ear when thinking, gentle hand gestures"
+    
+    animation_style: "Pixar-inspired 3D semi-realistic, soft expressions, graceful movements"
+    
+    render_instruction: "Keep this EXACT design in EVERY scene - same face, same hair with bangs, same outfit, same gentle demeanor"
 ```
 
 ### Lợi ích
@@ -63,12 +117,63 @@ Character consistency control:
 
 Veo/Sora sẽ nhận dạng chính xác hơn khi có ảnh tham chiếu!
 
+### ❓ TẠI SAO PHẢI MÔ TẢ NHÂN VẬT CHI TIẾT ĐẾN VẬY?
+
+**Vấn đề quan trọng nhất**: AI video generators (Veo 3, Sora 2, Runway Gen-3, Pika 2.0) sẽ **tái tạo lại nhân vật từ mô tả text** trong mỗi scene. 
+
+❌ **Nếu mô tả không đủ chi tiết**, AI sẽ "tưởng tượng" các chi tiết khác nhau → nhân vật trông khác nhau giữa các scene!
+
+#### Ví dụ mô tả THIẾU chi tiết (SAI):
+```
+Nam: "học sinh nam 12 tuổi, áo trắng, quần xanh"
+```
+→ AI có thể tạo:
+- **Scene 1**: Mặt tròn, mắt to, tóc dài
+- **Scene 2**: Mặt dài, mắt nhỏ, tóc ngắn  
+- **Scene 3**: Mặt vuông, mắt vừa, tóc xoăn
+
+❓ **Tại sao?** Vì AI không biết chính xác "mặt tròn hay vuông?", "mắt to hay nhỏ?", "tóc dài hay ngắn?"
+
+#### Ví dụ mô tả ĐẦY ĐỦ (ĐÚNG - như template trên):
+```
+Nam:
+  age: "12 years old"
+  
+  facial_features:
+    face_shape: "round, soft youthful features"
+    eyes: "dark brown eyes, large and bright, expressive"
+    nose: "small button nose"
+    mouth: "wide cheerful smile, natural Vietnamese features"
+    skin_tone: "light warm Vietnamese skin tone"
+    distinctive_marks: "small dimple on left cheek when smiling"
+  
+  hair:
+    style: "short neat cut, typical Vietnamese student"
+    color: "black hair"
+    texture: "straight, slightly thick"
+    details: "neatly combed, side part"
+  
+  body:
+    height: "average for age, around 145cm"
+    build: "slim, youthful athletic build"
+    posture: "confident, curious stance"
+```
+
+✅ **Kết quả**: AI sẽ tạo **cùng một khuôn mặt, cùng kiểu tóc, cùng dáng người** trong TẤT CẢ các scene!
+
+#### 📐 Nguyên tắc vàng:
+**"Mô tả chi tiết như bạn đang vẽ chân dung cho họa sĩ Pixar!"**
+
+- Càng chi tiết → Càng đồng nhất
+- Thiếu chi tiết → AI "tự sáng tạo" → Mất continuity
+- Template trên đã tối ưu cho Veo 3 và Sora 2
+
 ---
 
-## 🏫 II. ENVIRONMENT CONTROL
+## 🌅 II. ENVIRONMENT CONTROL
 
 ### Mục đích
-Đảm bảo bối cảnh (ánh sáng, sân trường, lớp học) không thay đổi tone giữa các video.
+Giữ ánh sáng, bối cảnh, vật dụng giống nhau giữa các cảnh.
 
 ### Cấu trúc trong SETTING CHUNG
 
