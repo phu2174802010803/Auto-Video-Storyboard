@@ -54,8 +54,8 @@ const StoryCreator = () => {
     };
 
     const finalDuration = duration === 'custom' ? customDuration : duration;
-    const finalWordCount = duration === 'custom' 
-        ? parseInt(customDuration) * 500 
+    const finalWordCount = duration === 'custom'
+        ? parseInt(customDuration) * 500
         : getWordCountFromDuration(duration);
     const finalStyle = style === '✨ Tùy chỉnh' ? customStyle : style;
 
@@ -265,6 +265,7 @@ const StoryCreator = () => {
             if (mode === 'idea') {
                 result = await window.electronAPI.generateStoryFromIdea({
                     idea,
+                    duration: finalDuration,
                     wordCount: finalWordCount,
                     style: finalStyle,
                     apiKey,
@@ -283,6 +284,7 @@ const StoryCreator = () => {
                     sourceType,
                     fileName: fileName || '',
                     urlIdea: urlIdea || '', // Additional idea for URL/File mode
+                    duration: finalDuration,
                     wordCount: finalWordCount,
                     style: finalStyle,
                     apiKey,

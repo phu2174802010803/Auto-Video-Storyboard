@@ -191,7 +191,7 @@ Format: Markdown với emoji, rõ ràng, dễ đọc. Phân tích đầy đủ, 
 // IPC HANDLERS - Story Generation
 // ============================================
 
-ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
+ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
@@ -267,9 +267,29 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             stylePrompt = `\nPhong cách hình ảnh: ${style}`;
         }
 
-        // Build detailed prompt based on standard format
-        const sceneStructure = addBridgeScenes ? '9 cảnh (6 cảnh chính + 3 cảnh bridge chuyển cảnh)' : '6 cảnh chính';
-        const totalDuration = addBridgeScenes ? '~65s' : '~60s';
+        // Calculate scenes and duration based on user input
+        const durationMinutes = parseInt(duration || wordCount / 500 || 2); // duration in minutes, fallback to wordCount or default 2
+        const totalSeconds = durationMinutes * 60;
+        const mainSceneDuration = 10; // seconds per main scene
+        const bridgeSceneDuration = 3; // seconds per bridge scene
+        
+        let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
+        
+        if (addBridgeScenes) {
+            // Calculate with bridge scenes: every 2 main scenes need 1 bridge
+            numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
+            numBridgeScenes = Math.max(0, numMainScenes - 1); // bridges between main scenes
+            const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
+            sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} cảnh chính + ${numBridgeScenes} cảnh bridge)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+        } else {
+            // Calculate without bridge scenes
+            numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
+            numBridgeScenes = 0;
+            const actualDuration = numMainScenes * mainSceneDuration;
+            sceneStructure = `${numMainScenes} cảnh chính`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+        }
 
         const prompt = `Hãy tạo storyboard video giáo dục toán học CHUẨN CHUYÊN NGHIỆP cho chủ đề sau:
 
@@ -380,7 +400,7 @@ Hãy tạo storyboard theo ĐÚNG format trên!`;
     }
 });
 
-ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceType, fileName, urlIdea, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
+ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceType, fileName, urlIdea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
 
@@ -470,8 +490,30 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             stylePrompt = `\nPhong cách hình ảnh: ${style}`;
         }
 
-        const sceneStructure = addBridgeScenes ? '9 cảnh (6 chính + 3 bridge)' : '6 cảnh chính';
-        const totalDuration = addBridgeScenes ? '~65s' : '~60s';
+        // Calculate scenes and duration based on user input
+        const durationMinutes = parseInt(duration || wordCount / 500 || 2); // duration in minutes
+        const totalSeconds = durationMinutes * 60;
+        const mainSceneDuration = 10; // seconds per main scene
+        const bridgeSceneDuration = 3; // seconds per bridge scene
+        
+        let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
+        
+        if (addBridgeScenes) {
+            // Calculate with bridge scenes
+            numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
+            numBridgeScenes = Math.max(0, numMainScenes - 1);
+            const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
+            sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} chính + ${numBridgeScenes} bridge)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+        } else {
+            // Calculate without bridge scenes
+            numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
+            numBridgeScenes = 0;
+            const actualDuration = numMainScenes * mainSceneDuration;
+            sceneStructure = `${numMainScenes} cảnh chính`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+        }
+        
         const sourceLabel = sourceType === 'file' ? `file ${fileName}` : 'bài viết';
 
         // Build content section with optional urlIdea
@@ -822,9 +864,9 @@ Scene description: [Overall context with characters and setting]
 Characters in scene: [List characters with reference to consistency control]
 
 Beat plan:
-  0–${Math.floor(sceneDuration/3)}s: [Opening action]
-  ${Math.floor(sceneDuration/3)}–${Math.floor(sceneDuration*2/3)}s: [Main action]
-  ${Math.floor(sceneDuration*2/3)}–${sceneDuration}s: [Closing/transition]
+  0–${Math.floor(sceneDuration / 3)}s: [Opening action]
+  ${Math.floor(sceneDuration / 3)}–${Math.floor(sceneDuration * 2 / 3)}s: [Main action]
+  ${Math.floor(sceneDuration * 2 / 3)}–${sceneDuration}s: [Closing/transition]
 
 Camera: [Camera angle]
 
