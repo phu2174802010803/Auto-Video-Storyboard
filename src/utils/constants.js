@@ -51,10 +51,170 @@ export const STORAGE_KEYS = {
     METADATAS: 'veo-suite-generated-metadatas'
 };
 
-// AI Models
+// AI Models Configuration
+export const GEMINI_MODELS = [
+    {
+        id: 'gemini-2.5-flash',
+        name: 'Gemini 2.5 Flash',
+        description: 'Model tốt nhất về giá/hiệu suất, hỗ trợ thinking, xử lý quy mô lớn',
+        tier: 'newest',
+        free: {
+            rpm: 10, // Requests per minute
+            rpd: 1500, // Requests per day
+            tpm: 4000000 // Tokens per minute
+        },
+        paid: {
+            rpm: 1000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Thinking', 'Google Search'],
+        contextWindow: '1M tokens',
+        recommended: true
+    },
+    {
+        id: 'gemini-2.5-flash-lite',
+        name: 'Gemini 2.5 Flash Lite',
+        description: 'Model nhanh nhất, tối ưu chi phí và thông lượng cao',
+        tier: 'newest',
+        free: {
+            rpm: 10,
+            rpd: 1500,
+            tpm: 4000000
+        },
+        paid: {
+            rpm: 1000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Google Search'],
+        contextWindow: '1M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-2.0-flash',
+        name: 'Gemini 2.0 Flash',
+        description: 'Model thế hệ 2 cân bằng, phù hợp mọi tác vụ, xây dựng Agent',
+        tier: 'stable',
+        free: {
+            rpm: 10,
+            rpd: 1500,
+            tpm: 4000000
+        },
+        paid: {
+            rpm: 2000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Image Gen', 'Google Search'],
+        contextWindow: '1M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-2.0-flash-lite',
+        name: 'Gemini 2.0 Flash Lite',
+        description: 'Model nhỏ nhất thế hệ 2, tối ưu chi phí cho quy mô lớn',
+        tier: 'stable',
+        free: {
+            rpm: 10,
+            rpd: 1500,
+            tpm: 4000000
+        },
+        paid: {
+            rpm: 2000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio'],
+        contextWindow: '1M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        description: 'Model ổn định thế hệ 1.5, phổ biến và tin cậy',
+        tier: 'legacy',
+        free: {
+            rpm: 15,
+            rpd: 1500,
+            tpm: 1000000
+        },
+        paid: {
+            rpm: 2000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Google Search'],
+        contextWindow: '1M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-1.5-flash-8b',
+        name: 'Gemini 1.5 Flash-8B',
+        description: 'Model nhỏ, nhanh, chi phí thấp cho khối lượng lớn',
+        tier: 'legacy',
+        free: {
+            rpm: 15,
+            rpd: 1500,
+            tpm: 4000000
+        },
+        paid: {
+            rpm: 4000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Google Search'],
+        contextWindow: '1M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-1.5-pro',
+        name: 'Gemini 1.5 Pro',
+        description: 'Model mạnh nhất thế hệ 1.5, phù hợp tác vụ phức tạp',
+        tier: 'legacy',
+        free: {
+            rpm: 2,
+            rpd: 50,
+            tpm: 32000
+        },
+        paid: {
+            rpm: 1000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Google Search', 'Complex Reasoning'],
+        contextWindow: '2M tokens',
+        recommended: false
+    },
+    {
+        id: 'gemini-2.0-flash-exp',
+        name: 'Gemini 2.0 Flash Experimental',
+        description: '⚠️ Model thử nghiệm, KHÔNG ổn định, quota RẤT THẤP',
+        tier: 'experimental',
+        free: {
+            rpm: 10,
+            rpd: 50, // Very limited!
+            tpm: 4000000
+        },
+        paid: {
+            rpm: 1000,
+            rpd: 50000,
+            tpm: 4000000
+        },
+        features: ['Text', 'Image', 'Video', 'Audio', 'Latest Features'],
+        contextWindow: '1M tokens',
+        recommended: false,
+        warning: 'Chỉ 50 requests/ngày miễn phí! Không dùng cho production.'
+    }
+];
+
+// Default model for the app (currently in use)
+export const DEFAULT_MODEL = 'gemini-1.5-flash';
+
+// Legacy - keep for backward compatibility
 export const AI_MODELS = {
-    STORY_GENERATION: 'gemini-2.0-flash-exp',
-    METADATA_GENERATION: 'gemini-2.0-flash-exp'
+    STORY_GENERATION: DEFAULT_MODEL,
+    METADATA_GENERATION: DEFAULT_MODEL
 };
 
 // System instructions

@@ -165,13 +165,16 @@ ipcMain.handle('read-file-content', async (event, filePath) => {
 });
 
 // Generate content summary for preview
-ipcMain.handle('generate-content-summary', async (event, { apiKey, content, source }) => {
+ipcMain.handle('generate-content-summary', async (event, { apiKey, content, source, model: selectedModel }) => {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
 
+        // Use user-selected model or fallback to default
+        const modelToUse = selectedModel || "gemini-1.5-flash";
+
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",  // Changed to stable model with 1500 RPD quota (vs 50 for exp)
+            model: modelToUse,
             generationConfig: {
                 maxOutputTokens: 16384,  // Increase for comprehensive 9-part analysis
                 temperature: 0.7
@@ -353,7 +356,7 @@ HÃY PHÂN TÍCH THEO ĐÚNG 9 PHẦN TRÊN!`;
 // IPC HANDLERS - Story Generation
 // ============================================
 
-ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
+ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity, model: selectedModel }) => {
     try {
         // Send initial progress
         event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo...' });
@@ -435,8 +438,11 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
 
         systemInstruction += ` Always write in Vietnamese, design for ANIMATED Vietnamese middle/high school student characters (Pixar 3D style) with red scarves. ALL characters MUST be 3D animated, NOT real people.`;
 
+        // Use user-selected model or fallback to default
+        const modelToUse = selectedModel || "gemini-1.5-flash";
+
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",  // Changed to stable model with higher quota
+            model: modelToUse,
             systemInstruction: systemInstruction
         });
 
@@ -604,7 +610,7 @@ Hãy tạo storyboard theo ĐÚNG format trên!`;
     }
 });
 
-ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceType, fileName, urlIdea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
+ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceType, fileName, urlIdea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity, model: selectedModel }) => {
     try {
         event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo...' });
 
@@ -699,8 +705,11 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             systemInstruction += ` Maintain strict CONTINUITY: lighting, camera direction, character positions.`;
         }
 
+        // Use user-selected model or fallback to default
+        const modelToUse = selectedModel || "gemini-1.5-flash";
+
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",  // Changed to stable model with higher quota
+            model: modelToUse,
             systemInstruction: systemInstruction
         });
 

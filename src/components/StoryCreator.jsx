@@ -6,10 +6,11 @@ import 'katex/dist/katex.min.css';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { STORY_STYLES, VIDEO_DURATION_PRESETS } from '../utils/constants';
+import ModelSelector from './ModelSelector';
 import './StoryCreator.css';
 
 const StoryCreator = () => {
-    const { apiKey, addStory } = useApp();
+    const { apiKey, selectedModel, saveSelectedModel, addStory } = useApp();
     const { success, error, warning } = useToast();
 
     // Load from localStorage on mount
@@ -170,7 +171,8 @@ const StoryCreator = () => {
             const result = await window.electronAPI.generateContentSummary({
                 content,
                 source,
-                apiKey
+                apiKey,
+                model: selectedModel // Pass selected model
             });
 
             if (result.success) {
@@ -297,6 +299,7 @@ const StoryCreator = () => {
                     wordCount: finalWordCount,
                     style: finalStyle,
                     apiKey,
+                    model: selectedModel, // Pass selected model
                     addBridgeScenes,
                     hideFormulas,
                     ensureContinuity,
@@ -316,6 +319,7 @@ const StoryCreator = () => {
                     wordCount: finalWordCount,
                     style: finalStyle,
                     apiKey,
+                    model: selectedModel, // Pass selected model
                     addBridgeScenes,
                     hideFormulas,
                     ensureContinuity,
@@ -401,6 +405,13 @@ const StoryCreator = () => {
             <div className="story-creator-header">
                 <h2>🎬 Tạo Storyboard Video bằng AI</h2>
             </div>
+
+            {/* Model Selector */}
+            <ModelSelector 
+                value={selectedModel}
+                onChange={saveSelectedModel}
+                disabled={loading}
+            />
 
             <div className="creator-grid">
                 {/* Input Section */}

@@ -12,16 +12,19 @@ export const useApp = () => {
 
 export const AppProvider = ({ children }) => {
     const [apiKey, setApiKey] = useState('');
+    const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash'); // Default model
     const [stories, setStories] = useState([]);
     const [metadatas, setMetadatas] = useState([]);
 
     // Load data from localStorage on mount
     useEffect(() => {
         const savedApiKey = localStorage.getItem('veo-api-key');
+        const savedModel = localStorage.getItem('veo-selected-model');
         const savedStories = localStorage.getItem('veo-suite-stories');
         const savedMetadatas = localStorage.getItem('veo-suite-generated-metadatas');
 
         if (savedApiKey) setApiKey(savedApiKey);
+        if (savedModel) setSelectedModel(savedModel);
         if (savedStories) setStories(JSON.parse(savedStories));
         if (savedMetadatas) setMetadatas(JSON.parse(savedMetadatas));
     }, []);
@@ -30,6 +33,12 @@ export const AppProvider = ({ children }) => {
     const saveApiKey = (key) => {
         setApiKey(key);
         localStorage.setItem('veo-api-key', key);
+    };
+
+    // Save selected model to localStorage
+    const saveSelectedModel = (model) => {
+        setSelectedModel(model);
+        localStorage.setItem('veo-selected-model', model);
     };
 
     // Add story
@@ -75,6 +84,8 @@ export const AppProvider = ({ children }) => {
     const value = {
         apiKey,
         saveApiKey,
+        selectedModel,
+        saveSelectedModel,
         stories,
         addStory,
         updateStory,
