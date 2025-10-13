@@ -12,7 +12,7 @@ export const useApp = () => {
 
 export const AppProvider = ({ children }) => {
     const [apiKey, setApiKey] = useState('');
-    const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash'); // Default model
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-lite'); // Default: highest quota model
     const [stories, setStories] = useState([]);
     const [metadatas, setMetadatas] = useState([]);
 

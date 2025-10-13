@@ -170,8 +170,8 @@ ipcMain.handle('generate-content-summary', async (event, { apiKey, content, sour
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Use user-selected model or fallback to default
-        const modelToUse = selectedModel || "gemini-1.5-flash";
+        // Use user-selected model or fallback to highest quota model
+        const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
         const model = genAI.getGenerativeModel({ 
             model: modelToUse,
@@ -438,8 +438,8 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
 
         systemInstruction += ` Always write in Vietnamese, design for ANIMATED Vietnamese middle/high school student characters (Pixar 3D style) with red scarves. ALL characters MUST be 3D animated, NOT real people.`;
 
-        // Use user-selected model or fallback to default
-        const modelToUse = selectedModel || "gemini-1.5-flash";
+        // Use user-selected model or fallback to highest quota model (2.5 Flash Lite: 1,000 RPD)
+        const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
         const model = genAI.getGenerativeModel({
             model: modelToUse,
@@ -705,8 +705,8 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             systemInstruction += ` Maintain strict CONTINUITY: lighting, camera direction, character positions.`;
         }
 
-        // Use user-selected model or fallback to default
-        const modelToUse = selectedModel || "gemini-1.5-flash";
+        // Use user-selected model or fallback to highest quota model (2.5 Flash Lite: 1,000 RPD)
+        const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
         const model = genAI.getGenerativeModel({
             model: modelToUse,
