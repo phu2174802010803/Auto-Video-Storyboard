@@ -171,7 +171,7 @@ ipcMain.handle('generate-content-summary', async (event, { apiKey, content, sour
         const genAI = new GoogleGenerativeAI(apiKey);
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-flash",  // Changed to stable model with 1500 RPD quota (vs 50 for exp)
             generationConfig: {
                 maxOutputTokens: 16384,  // Increase for comprehensive 9-part analysis
                 temperature: 0.7
@@ -436,7 +436,7 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         systemInstruction += ` Always write in Vietnamese, design for ANIMATED Vietnamese middle/high school student characters (Pixar 3D style) with red scarves. ALL characters MUST be 3D animated, NOT real people.`;
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-flash",  // Changed to stable model with higher quota
             systemInstruction: systemInstruction
         });
 
@@ -700,7 +700,7 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         }
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-flash",  // Changed to stable model with higher quota
             systemInstruction: systemInstruction
         });
 
@@ -824,7 +824,7 @@ ipcMain.handle('generate-metadata', async (event, { apiKey, story }) => {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp"
+            model: "gemini-1.5-flash"  // Changed to stable model with higher quota
         });
 
         const prompt = `Dựa trên storyboard video giáo dục toán học sau đây, hãy tạo metadata cho video:
@@ -993,7 +993,7 @@ ipcMain.handle('generate-video-prompts', async (event, { config, apiKey }) => {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: config.model === 'fast' ? 'gemini-2.0-flash-exp' : 'gemini-1.5-pro'
+            model: config.model === 'fast' ? 'gemini-1.5-flash' : 'gemini-1.5-pro'  // Changed exp to stable
         });
 
         event.sender.send('progress-update', { progress: 10, status: 'Đang tính toán số lượng prompt...' });
@@ -1196,7 +1196,7 @@ ipcMain.handle('generate-character-bible', async (event, { context, characters, 
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
 
         event.sender.send('progress-update', { progress: 15, status: 'Đang chuẩn bị mô tả nhân vật...' });
 
@@ -1282,7 +1282,7 @@ ipcMain.handle('generate-storyboard', async (event, { context, idea, genre, aspe
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
 
         const calculatedScenes = numScenes || Math.ceil(idea.length / 100); // Auto-calculate if not provided
 
@@ -1392,7 +1392,7 @@ ipcMain.handle('regenerate-scene', async (event, { context, idea, genre, aspectR
     try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
 
         const systemPrompt = `You are an expert storyboard creator for AI video generation.
 
@@ -1481,7 +1481,7 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
 
         // CRITICAL: Increase output tokens to prevent truncation
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-1.5-flash',  // Changed to stable model with higher quota
             generationConfig: {
                 maxOutputTokens: 8192,  // Increased from default 2048
                 temperature: 0.7,
