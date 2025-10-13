@@ -146,6 +146,18 @@ const PromptGenerator = () => {
         setProgress(0);
         setProgressStatus('Đang bắt đầu...');
 
+        // Start simulated progress (smooth increments while waiting for AI)
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                // Slow down as we approach the expected real milestone
+                if (prev < 30) return prev + 2;      // Fast start: 0-30%
+                if (prev < 55) return prev + 1;      // Medium: 30-55%
+                if (prev < 75) return prev + 0.5;    // Slow: 55-75%
+                if (prev < 90) return prev + 0.2;    // Very slow: 75-90%
+                return prev; // Stop at 90% and wait for real completion
+            });
+        }, 500); // Update every 500ms
+
         try {
             const result = await window.electronAPI.generateStructuredPrompts({
                 storyboard: selectedStory,
@@ -176,17 +188,22 @@ const PromptGenerator = () => {
         } catch (err) {
             console.error('Error generating prompts:', err);
             showError(`Lỗi: ${err.message}`);
+            clearInterval(progressInterval); // Stop simulation on error
             setProgress(0);
             setProgressStatus('');
         } finally {
+            clearInterval(progressInterval); // Stop simulation when done
             setIsGeneratingPrompts(false);
+            
+            // Ensure we reach 100% before clearing
+            setProgress(100);
+            setProgressStatus('Hoàn tất!');
+            
             // Keep progress at 100% for 2 seconds before clearing
-            if (progress === 100 || progress >= 85) {
-                setTimeout(() => {
-                    setProgress(0);
-                    setProgressStatus('');
-                }, 2000);
-            }
+            setTimeout(() => {
+                setProgress(0);
+                setProgressStatus('');
+            }, 2000);
         }
     };
 

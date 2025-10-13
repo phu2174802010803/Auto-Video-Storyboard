@@ -275,6 +275,18 @@ const StoryCreator = () => {
         setProgress(0);
         setProgressStatus('Đang bắt đầu...');
 
+        // Start simulated progress (smooth increments while waiting for AI)
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                // Slow down as we approach the expected real milestone
+                if (prev < 25) return prev + 2;      // Fast start: 0-25%
+                if (prev < 50) return prev + 1;      // Medium: 25-50%
+                if (prev < 70) return prev + 0.5;    // Slow: 50-70%
+                if (prev < 85) return prev + 0.2;    // Very slow: 70-85%
+                return prev; // Stop at 85% and wait for real completion
+            });
+        }, 500); // Update every 500ms
+
         try {
             let result;
 
@@ -334,17 +346,22 @@ const StoryCreator = () => {
             }
         } catch (err) {
             error(`Có lỗi xảy ra: ${err.message}`);
+            clearInterval(progressInterval); // Stop simulation on error
             setProgress(0);
             setProgressStatus('');
         } finally {
+            clearInterval(progressInterval); // Stop simulation when done
             setLoading(false);
+            
+            // Ensure we reach 100% before clearing
+            setProgress(100);
+            setProgressStatus('Hoàn tất!');
+            
             // Keep progress at 100% for 2 seconds before clearing
-            if (progress === 100 || progress >= 90) {
-                setTimeout(() => {
-                    setProgress(0);
-                    setProgressStatus('');
-                }, 2000);
-            }
+            setTimeout(() => {
+                setProgress(0);
+                setProgressStatus('');
+            }, 2000);
         }
     };
 
