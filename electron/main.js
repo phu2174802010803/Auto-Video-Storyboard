@@ -230,7 +230,17 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         }
 
         if (hideFormulas) {
-            systemInstruction += ` CRITICAL: GEOMETRY-ONLY mode - NO text, NO formulas, NO numbers, NO Vietnamese text on-screen. All content delivered through dialogue and actions only.`;
+            systemInstruction += ` 
+⛔ CRITICAL - ABSOLUTE BAN ON TEXT/NUMBERS/FORMULAS IN VIDEO:
+- NO mathematical expressions (e.g., "2/3", "1/2 + 1/3", "x + y = z")
+- NO numbers written anywhere (e.g., "3", "15", "0.5")
+- NO Vietnamese text on screen (e.g., labels, titles, captions)
+- NO symbols (e.g., "=", "+", "÷", "×", "√")
+- REASON: AI video generators (Veo, Sora, Runway) ALWAYS render text/math INCORRECTLY
+- EXAMPLE BAD: "2/3 - (1/2 + 1/3)" written on board → AI renders wrong formula
+- SOLUTION: Character speaks "hai phần ba trừ một nửa cộng một phần ba" while pointing at empty board
+- ALL math content MUST be delivered through DIALOGUE and VISUAL ACTIONS only
+- Use visual representations: show fraction bars, geometric shapes, counting with fingers/objects`;
         }
 
         if (ensureContinuity) {
@@ -415,7 +425,14 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         }
 
         if (hideFormulas) {
-            systemInstruction += ` GEOMETRY-ONLY mode - NO text, NO formulas on-screen. All content through dialogue.`;
+            systemInstruction += ` 
+⛔ ABSOLUTE BAN - NO TEXT/NUMBERS/FORMULAS IN VIDEO:
+- NO math expressions (e.g., "2/3 - (1/2 + 1/3)", "a² + b² = c²")
+- NO numbers anywhere (e.g., "3", "0.5", "15")
+- NO text labels (e.g., Vietnamese text, subtitles, captions)
+- REASON: AI video generators render text/formulas INCORRECTLY
+- SOLUTION: ALL content via DIALOGUE + VISUAL ACTIONS only
+- EXAMPLE: Character says "hai phần ba trừ một nửa" while showing fraction bars visually`;
         }
 
         if (ensureContinuity) {
@@ -460,11 +477,12 @@ ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 1. Phân tích nội dung chính của bài viết
 2. Tạo ${sceneStructure} (mỗi cảnh chính 10s, cảnh bridge 3s, tổng ${totalDuration})
 3. 3 giây cuối mỗi cảnh chính: freeze frame để chèn text overlay
-4. ${hideFormulas ? 'GEOMETRY-ONLY: Không text/công thức trên màn hình, toàn bộ qua thoại' : 'Có thể có text/công thức nếu cần'}
+4. ${hideFormulas ? '⛔ CRITICAL - ABSOLUTE BAN: KHÔNG text/số/công thức trên màn hình. VÍ DỤ SAI: "2/3 - (1/2 + 1/3)" viết trên bảng → AI render sai. ĐÚNG: Nhân vật nói "hai phần ba trừ một nửa cộng một phần ba" và chỉ vào bảng trống/vật thể trực quan. Toàn bộ qua THOẠI + HÀNH ĐỘNG TRỰC QUAN.' : 'Có thể có text/công thức nếu cần'}
 5. Mô tả: nhân vật (đeo khăn quàng đỏ), bối cảnh, camera, ánh sáng, hành động
 6. Beat plan chi tiết cho mỗi cảnh
 7. ${ensureContinuity ? 'Đảm bảo continuity: ánh sáng đồng nhất, hướng camera nhất quán, không teleport nhân vật' : 'Chuyển cảnh tự nhiên'}
 8. Phù hợp học sinh THCS/THPT Việt Nam
+9. ⚠️ LƯU Ý QUAN TRỌNG: AI video generators (Veo 3, Sora 2, Runway Gen-3) LUÔN render sai các công thức toán học và chữ số. Thay vào đó, sử dụng biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay/vật thể) và lời thoại.
 
 **Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề]"
@@ -1194,7 +1212,17 @@ Audio continuity:
 
 Camera style: Góc quay trung bình (mid-shot) cho thoại, top-view khi mô phỏng hình học. Giữ khung hình ổn định, chuyển động mượt, tránh lia máy nhanh.
 
-Animation notes: Mọi hình khối hình học phải chính xác (đáy tròn, chiều cao vuông góc, mặt xung quanh đúng tỷ lệ). Không hiển thị chữ, số, công thức hay ký hiệu toán học trên video. Chỉ biểu diễn bằng hình ảnh và lời thoại.
+Animation notes: Mọi hình khối hình học phải chính xác (đáy tròn, chiều cao vuông góc, mặt xung quanh đúng tỷ lệ). 
+
+⛔ ABSOLUTE BAN - TEXT/NUMBERS/FORMULAS:
+  • KHÔNG hiển thị: chữ, số, công thức, ký hiệu toán học (e.g., "2/3 - (1/2 + 1/3)", "=", "+", "×", "√")
+  • LÝ DO: AI video generators (Veo 3, Sora 2, Runway Gen-3, Pika 2.0) LUÔN LUÔN render sai công thức và số
+  • VÍ DỤ SAI: Viết "2/3 - (1/2 + 1/3)" lên bảng → AI tạo ra "2/5 - (1/3 + 1/2)" hoặc ký hiệu lộn xộn
+  • GIẢI PHÁP: 
+    - Nhân vật NÓI: "hai phần ba trừ một nửa cộng một phần ba"
+    - Nhân vật CHỈ TAY vào bảng trống hoặc vật thể trực quan (thanh phân số, hình khối màu)
+    - Sử dụng biểu diễn TRỰC QUAN: thanh phân số bằng hình chữ nhật chia đoạn, đếm bằng ngón tay/vật thể
+  • CHỈ ĐƯỢC: Hình ảnh trực quan + lời thoại + hành động cử chỉ
 
 Duration default: 10s mỗi cảnh
 Aspect: 16:9
@@ -1242,7 +1270,11 @@ Geometry mode: [2D or 3D as appropriate for content]
 
 Lighting: [Maintain consistency with SETTING CHUNG - left-top soft daylight, 5200K, consistent shadows]
 
-Render control: Không text, không công thức. Chỉ hiển thị vật thể, hành động và cử chỉ nhân vật.
+Render control: 
+  ⛔ ABSOLUTE BAN: Không text, không số, không công thức, không ký hiệu toán học
+  ✅ CHỈ ĐƯỢC: Vật thể trực quan + hành động + cử chỉ nhân vật + lời thoại
+  • VÍ DỤ: Thay vì viết "2/3" → dùng thanh phân số (hình chữ nhật chia 3 phần, tô 2 phần)
+  • VÍ DỤ: Thay vì viết "5 + 3 = 8" → nhân vật đếm 5 ngón tay, thêm 3 ngón, nói "tám"
 
 Character consistency check: [Verify all characters match their reference_tag descriptions from SETTING CHUNG]
 
@@ -1280,8 +1312,15 @@ TTS Script:
 9. MAINTAIN ENVIRONMENT CONSISTENCY: Same lighting (left-top, 5200K), same classroom layout, same props across ALL scenes
 10. MAINTAIN AUDIO CONSISTENCY: Same ambient sounds, same volume ratios throughout
 11. Each scene exactly 10 seconds
-12. NO text, numbers, or formulas visible in video - only dialogue
-13. Focus on geometric accuracy for math/science content
+12. ⛔ ABSOLUTE BAN - NO TEXT/NUMBERS/FORMULAS VISIBLE IN VIDEO:
+    - NO mathematical expressions (e.g., "2/3 - (1/2 + 1/3)", "x + y = z")
+    - NO numbers written anywhere (e.g., "3", "15", "0.5")
+    - NO text labels, subtitles, or captions
+    - REASON: AI video generators (Veo 3, Sora 2, Runway Gen-3, Pika 2.0) ALWAYS render text/math INCORRECTLY
+    - EXAMPLE WRONG: Show "2/3 - (1/2 + 1/3)" written on board → AI renders with wrong symbols/numbers
+    - EXAMPLE CORRECT: Character says "hai phần ba trừ một nửa cộng một phần ba" while pointing at empty board OR showing visual fraction bars
+    - ALL math content MUST be delivered through DIALOGUE and VISUAL ACTIONS only (fraction bars, shapes, counting with objects)
+13. Focus on geometric accuracy for math/science content - use VISUAL representations, NOT written text
 14. Use Continuity metadata in EVERY scene to link timeline
 15. When describing characters in scenes, ALWAYS reference their full consistency control description from SETTING CHUNG
 16. Transition types must be smooth and maintain visual continuity
