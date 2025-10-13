@@ -325,7 +325,6 @@ const StoryCreator = () => {
 
             if (result.success) {
                 setGeneratedStory(result.story);
-                setShowResult(true);
 
                 // Save to history
                 const newStory = {
