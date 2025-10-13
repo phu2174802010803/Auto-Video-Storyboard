@@ -13,6 +13,8 @@ const PromptGenerator = () => {
     const [selectedStoryId, setSelectedStoryId] = useState('');
     const [videoPrompts, setVideoPrompts] = useState('');
     const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [progressStatus, setProgressStatus] = useState('');
 
     // Tab 2: History
     const [promptHistory, setPromptHistory] = useState([]);
@@ -28,6 +30,18 @@ const PromptGenerator = () => {
                 console.error('Error loading history:', err);
             }
         }
+    }, []);
+
+    // Setup progress listener
+    useEffect(() => {
+        const unsubscribe = window.electronAPI.onProgressUpdate((data) => {
+            setProgress(data.progress);
+            setProgressStatus(data.status);
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, []);
 
     // Filter history by date (only video-prompts are supported now)
@@ -129,6 +143,8 @@ const PromptGenerator = () => {
 
         setIsGeneratingPrompts(true);
         setVideoPrompts('');
+        setProgress(0);
+        setProgressStatus('Đang bắt đầu...');
 
         try {
             const result = await window.electronAPI.generateStructuredPrompts({
@@ -160,8 +176,17 @@ const PromptGenerator = () => {
         } catch (err) {
             console.error('Error generating prompts:', err);
             showError(`Lỗi: ${err.message}`);
+            setProgress(0);
+            setProgressStatus('');
         } finally {
             setIsGeneratingPrompts(false);
+            // Keep progress at 100% for 2 seconds before clearing
+            if (progress === 100 || progress >= 85) {
+                setTimeout(() => {
+                    setProgress(0);
+                    setProgressStatus('');
+                }, 2000);
+            }
         }
     };
 
@@ -320,6 +345,18 @@ const PromptGenerator = () => {
                                 ) : null;
                             })()}
                         </div>
+
+                        {/* Progress Bar */}
+                        {isGeneratingPrompts && (
+                            <div className="progress-container">
+                                <div className="progress-bar-wrapper">
+                                    <div className="progress-bar" style={{ width: `${progress}%` }}>
+                                        <span className="progress-text">{progress}%</span>
+                                    </div>
+                                </div>
+                                <div className="progress-status">{progressStatus}</div>
+                            </div>
+                        )}
 
                         <button
                             onClick={handleGenerateVideoPrompts}

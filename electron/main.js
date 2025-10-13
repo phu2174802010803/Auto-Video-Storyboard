@@ -1255,9 +1255,21 @@ Return a single JSON object:
 // Generate structured video prompts from storyboard (Tab 1)
 ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey }) => {
     try {
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
+
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        
+        // CRITICAL: Increase output tokens to prevent truncation
+        const model = genAI.getGenerativeModel({ 
+            model: 'gemini-2.0-flash-exp',
+            generationConfig: {
+                maxOutputTokens: 8192,  // Increased from default 2048
+                temperature: 0.7,
+            }
+        });
+
+        event.sender.send('progress-update', { progress: 10, status: 'Đang phân tích storyboard...' });
 
         // Build system prompt with detailed template
         const systemPrompt = `You are an expert video prompt creator for educational videos.
@@ -1454,13 +1466,23 @@ TTS Script:
 
         const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
 
+        event.sender.send('progress-update', { progress: 20, status: 'Đang tạo SETTING CHUNG...' });
+
         console.log('🎬 Generating structured prompts...');
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        
+        event.sender.send('progress-update', { progress: 60, status: 'Đang tạo prompts cho từng cảnh...' });
+        
         const response = await result.response;
         const text = response.text();
 
+        event.sender.send('progress-update', { progress: 85, status: 'Đang hoàn thiện prompts...' });
+
         console.log('✅ Structured prompts generated');
+        console.log(`📊 Output length: ${text.length} characters`);
+
+        event.sender.send('progress-update', { progress: 100, status: 'Hoàn tất tạo prompts!' });
 
         return {
             success: true,
@@ -1469,6 +1491,7 @@ TTS Script:
 
     } catch (error) {
         console.error('Structured prompt generation error:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return {
             success: false,
             error: error.message || 'Unknown error occurred'
