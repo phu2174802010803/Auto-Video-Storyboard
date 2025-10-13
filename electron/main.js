@@ -998,17 +998,39 @@ Location: [Extract from storyboard - Vietnamese school context]
 Characters:
   [List all main characters with descriptions from storyboard]
 
+Character consistency control:
+  [For each main character, create consistency rules]
+  [Character name]:
+    reference_tag: "[CharacterName]_[role]"
+    face_embedding: fixed
+    outfit: "[detailed outfit description]"
+    hairstyle: "[detailed hairstyle]"
+    tone: "[skin tone description]"
+    physical_traits: "[height, build, distinctive features]"
+
+Environment control:
+  lighting_source: "left-top soft daylight"
+  temperature_kelvin: 5200
+  shadow_direction: "consistent across scenes"
+  color_palette: "warm neutral classroom tones"
+  prop_persistence: true
+  background_consistency: "maintain same classroom layout and decorations"
+
+Audio continuity:
+  ambient_loop: "classroom_soft_ambience"
+  crossfade_duration: 0.8s
+  maintain_volume_ratio: "speech 0.85 / ambience 0.15"
+  microphone_type: "lapel simulation"
+  background_sounds: "subtle paper rustling, pencil writing, distant classroom"
+
 Camera style: Góc quay trung bình (mid-shot) cho thoại, top-view khi mô phỏng hình học. Giữ khung hình ổn định, chuyển động mượt, tránh lia máy nhanh.
 
 Animation notes: Mọi hình khối hình học phải chính xác (đáy tròn, chiều cao vuông góc, mặt xung quanh đúng tỷ lệ). Không hiển thị chữ, số, công thức hay ký hiệu toán học trên video. Chỉ biểu diễn bằng hình ảnh và lời thoại.
-
-Sound ambience: Âm thanh lớp học nhẹ nhàng: tiếng giấy, tiếng bút viết, tiếng học sinh nhỏ phía sau. Không nhạc nền.
 
 Duration default: 10s mỗi cảnh
 Aspect: 16:9
 FPS: 24
 Voice tone: Giọng học thuật tiếng Việt, chậm rãi, rõ ràng (~0.85x).
-Lighting: Ánh sáng dịu, nguồn sáng từ trái trên, tone trung tính ấm.
 
 Focus priority:
   - Tính chính xác hình học
@@ -1017,7 +1039,10 @@ Focus priority:
 
 Render control: Không text, không ký hiệu, không label — chỉ hành động, vật thể, ánh sáng.
 
-Continuity: Màu sắc, ánh sáng, trang phục nhân vật phải đồng nhất xuyên suốt toàn video.
+Timeline metadata:
+  series_id: "[Generate unique ID from storyboard title]"
+  total_scenes: [Number of scenes]
+  continuity_mode: "strict"
 
 ---
 
@@ -1044,11 +1069,21 @@ Overlay (nếu có): [Optional visual indicators like arrows, light effects, hig
 
 Geometry mode: [2D or 3D as appropriate for content]
 
-Lighting: [Specific lighting setup for this scene]
+Lighting: [Maintain consistency with SETTING CHUNG - left-top soft daylight, 5200K, consistent shadows]
 
 Render control: Không text, không công thức. Chỉ hiển thị vật thể, hành động và cử chỉ nhân vật.
 
-Transition to next: [How this scene transitions to the next - smooth cut, fade, etc]
+Character consistency check: [Verify all characters match their reference_tag descriptions from SETTING CHUNG]
+
+Transition to next: [How this scene transitions to the next - smooth cut, fade, match action, etc]
+
+Continuity:
+  timeline_id: "[same series_id from SETTING CHUNG]"
+  scene_number: [current scene number]
+  previous_scene: "Scene_[number-1]" (or "None" if first scene)
+  next_scene: "Scene_[number+1]" (or "End" if last scene)
+  transition_type: "[soft cut / match action / fade / dissolve]"
+  maintain_from_previous: "[List key elements to keep: character positions, lighting angle, prop placement]"
 
 TTS Script:
   [Character name]: "[Dialogue line in Vietnamese]"
@@ -1063,10 +1098,15 @@ TTS Script:
 4. Keep Vietnamese language natural and educational
 5. All dialogue in TTS Script must be in Vietnamese
 6. No English in output except section labels
-7. Maintain consistency in character descriptions across all scenes
-8. Each scene exactly 10 seconds
-9. NO text, numbers, or formulas visible in video - only dialogue
-10. Focus on geometric accuracy for math/science content`;
+7. MAINTAIN STRICT CHARACTER CONSISTENCY: Each character MUST keep exact same face, hairstyle, outfit across ALL scenes using their reference_tag
+8. MAINTAIN ENVIRONMENT CONSISTENCY: Same lighting (left-top, 5200K), same classroom layout, same props across ALL scenes
+9. MAINTAIN AUDIO CONSISTENCY: Same ambient sounds, same volume ratios throughout
+10. Each scene exactly 10 seconds
+11. NO text, numbers, or formulas visible in video - only dialogue
+12. Focus on geometric accuracy for math/science content
+13. Use Continuity metadata in EVERY scene to link timeline
+14. When describing characters in scenes, reference their consistency control tags from SETTING CHUNG
+15. Transition types must be smooth and maintain visual continuity`;
 
         const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
 
