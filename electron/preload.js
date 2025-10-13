@@ -6,6 +6,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     generateStoryFromUrl: (params) => ipcRenderer.invoke('generate-story-from-url', params),
     generateMetadata: (params) => ipcRenderer.invoke('generate-metadata', params),
 
+    // Progress tracking
+    onProgressUpdate: (callback) => {
+        const subscription = (event, data) => callback(data);
+        ipcRenderer.on('progress-update', subscription);
+        return () => ipcRenderer.removeListener('progress-update', subscription);
+    },
+
     // File dialogs
     showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
     showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),

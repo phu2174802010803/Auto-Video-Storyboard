@@ -45,6 +45,8 @@ const StoryCreator = () => {
     const [customInstructions, setCustomInstructions] = useState(() => loadFromStorage('customInstructions', ''));
 
     const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [progressStatus, setProgressStatus] = useState('');
     const [generatedStory, setGeneratedStory] = useState(() => loadFromStorage('generatedStory', ''));
 
     // Calculate word count from duration
@@ -127,6 +129,18 @@ const StoryCreator = () => {
     useEffect(() => {
         localStorage.setItem('storyboard-showSummary', JSON.stringify(showSummary));
     }, [showSummary]);
+
+    // Setup progress listener
+    useEffect(() => {
+        const unsubscribe = window.electronAPI.onProgressUpdate((data) => {
+            setProgress(data.progress);
+            setProgressStatus(data.status);
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
 
     // Truncate filename for display
     const truncateFilename = (filename, maxLength = 30) => {
@@ -258,6 +272,8 @@ const StoryCreator = () => {
 
         setLoading(true);
         setGeneratedStory('');
+        setProgress(0);
+        setProgressStatus('Đang bắt đầu...');
 
         try {
             let result;
@@ -318,8 +334,17 @@ const StoryCreator = () => {
             }
         } catch (err) {
             error(`Có lỗi xảy ra: ${err.message}`);
+            setProgress(0);
+            setProgressStatus('');
         } finally {
             setLoading(false);
+            // Keep progress at 100% for 2 seconds before clearing
+            if (progress === 100 || progress >= 90) {
+                setTimeout(() => {
+                    setProgress(0);
+                    setProgressStatus('');
+                }, 2000);
+            }
         }
     };
 
@@ -620,6 +645,18 @@ const StoryCreator = () => {
                             />
                         </div>
                     </div>
+
+                    {/* Progress Bar */}
+                    {loading && (
+                        <div className="progress-container">
+                            <div className="progress-bar-wrapper">
+                                <div className="progress-bar" style={{ width: `${progress}%` }}>
+                                    <span className="progress-text">{progress}%</span>
+                                </div>
+                            </div>
+                            <div className="progress-status">{progressStatus}</div>
+                        </div>
+                    )}
 
                     <div className="button-group">
                         <button

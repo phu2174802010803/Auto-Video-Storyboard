@@ -193,8 +193,13 @@ Format: Markdown với emoji, rõ ràng, dễ đọc. Phân tích đầy đủ, 
 
 ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
     try {
+        // Send initial progress
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo...' });
+
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
+
+        event.sender.send('progress-update', { progress: 10, status: 'Đang chuẩn bị AI model...' });
 
         // Build system instruction based on options
         let systemInstruction = `You are an expert educational video storyboard writer, specializing in creating detailed scene-by-scene scripts for mathematics education videos. Your expertise includes cinematography, visual storytelling, and educational content design.
@@ -389,22 +394,34 @@ Transition: [Chuyển cảnh như thế nào]`}
 
 Hãy tạo storyboard theo ĐÚNG format trên!`;
 
+        event.sender.send('progress-update', { progress: 30, status: 'Đang gửi yêu cầu tới AI...' });
+
         const result = await model.generateContent(prompt);
+        
+        event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý phản hồi từ AI...' });
+        
         const response = result.response;
         const text = response.text();
+
+        event.sender.send('progress-update', { progress: 90, status: 'Hoàn tất tạo storyboard!' });
 
         return { success: true, story: text };
     } catch (error) {
         console.error('Error generating story:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return { success: false, error: error.message };
     }
 });
 
 ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceType, fileName, urlIdea, duration, wordCount, style, customInstructions, addBridgeScenes, hideFormulas, ensureContinuity }) => {
     try {
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo...' });
+
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
 
         let content = '';
+
+        event.sender.send('progress-update', { progress: 10, status: sourceType === 'file' ? 'Đang đọc file...' : 'Đang tải nội dung từ URL...' });
 
         // Check if it's file content or URL
         if (sourceType === 'file') {
@@ -421,6 +438,8 @@ ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceTyp
                 }).on('error', reject);
             });
         }
+
+        event.sender.send('progress-update', { progress: 20, status: 'Đang chuẩn bị AI model...' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -576,13 +595,21 @@ Bao gồm số cảnh, âm thanh, font chữ, công thức, lighting, transition
 
 Hãy tạo storyboard theo ĐÚNG format CHUẨN trên!`;
 
+        event.sender.send('progress-update', { progress: 35, status: 'Đang phân tích nội dung...' });
+
         const result = await model.generateContent(prompt);
+        
+        event.sender.send('progress-update', { progress: 75, status: 'Đang tạo storyboard từ nội dung...' });
+        
         const response = result.response;
         const text = response.text();
+
+        event.sender.send('progress-update', { progress: 95, status: 'Hoàn tất tạo storyboard!' });
 
         return { success: true, story: text };
     } catch (error) {
         console.error('Error generating story from URL:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return { success: false, error: error.message };
     }
 });
@@ -756,11 +783,15 @@ async function downloadVideoFromUrl(videoUrl, promptText, savePath, index) {
 // ==========================================
 ipcMain.handle('generate-video-prompts', async (event, { config, apiKey }) => {
     try {
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
+
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
             model: config.model === 'fast' ? 'gemini-2.0-flash-exp' : 'gemini-1.5-pro'
         });
+
+        event.sender.send('progress-update', { progress: 10, status: 'Đang tính toán số lượng prompt...' });
 
         // Calculate number of prompts based on duration
         const sceneDuration = config.promptType === 'detailed' ? 10 : config.promptType === 'medium' ? 8 : 5;
@@ -909,9 +940,16 @@ TTS Script:
             userPrompt = `Create ${numPrompts} video scenes for a ${config.storyType} video in ${config.style} style.`;
         }
 
+        event.sender.send('progress-update', { progress: 25, status: `Đang tạo ${numPrompts} prompt video...` });
+
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        
+        event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý và format prompts...' });
+        
         const response = await result.response;
         const text = response.text().trim();
+
+        event.sender.send('progress-update', { progress: 95, status: `Hoàn tất tạo ${numPrompts} prompts!` });
 
         console.log(`✅ Generated structured prompts with SETTING CHUNG + ${numPrompts} scenes`);
 
@@ -922,6 +960,7 @@ TTS Script:
 
     } catch (error) {
         console.error('Prompt generation error:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return {
             success: false,
             error: error.message || 'Unknown error occurred'
@@ -934,9 +973,13 @@ TTS Script:
 // Generate Character Bible
 ipcMain.handle('generate-character-bible', async (event, { context, characters, idea, genre, apiKey }) => {
     try {
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo Character Bible...' });
+
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+        event.sender.send('progress-update', { progress: 15, status: 'Đang chuẩn bị mô tả nhân vật...' });
 
         const systemPrompt = `You are an expert video prompt writer specializing in creating detailed character descriptions for AI video generation.
 
@@ -971,7 +1014,12 @@ Both paragraphs must be on ONE LINE each (no \\n inside the strings).`;
 
         const userPrompt = `Based on this video idea, create a Character Bible:\n\n${idea}`;
 
+        event.sender.send('progress-update', { progress: 30, status: 'Đang tạo Character Bible...' });
+
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        
+        event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý Character Bible...' });
+        
         const response = await result.response;
         let text = response.text();
 
@@ -986,6 +1034,8 @@ Both paragraphs must be on ONE LINE each (no \\n inside the strings).`;
             throw new Error('Invalid Character Bible format');
         }
 
+        event.sender.send('progress-update', { progress: 95, status: 'Hoàn tất Character Bible!' });
+
         console.log('✅ Generated Character Bible');
 
         return {
@@ -998,6 +1048,7 @@ Both paragraphs must be on ONE LINE each (no \\n inside the strings).`;
 
     } catch (error) {
         console.error('Character Bible generation error:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return {
             success: false,
             error: error.message || 'Unknown error occurred'
@@ -1008,11 +1059,15 @@ Both paragraphs must be on ONE LINE each (no \\n inside the strings).`;
 // Generate Storyboard
 ipcMain.handle('generate-storyboard', async (event, { context, idea, genre, aspectRatio, numScenes, characterBible, apiKey }) => {
     try {
+        event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo Storyboard...' });
+
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
         const calculatedScenes = numScenes || Math.ceil(idea.length / 100); // Auto-calculate if not provided
+
+        event.sender.send('progress-update', { progress: 15, status: `Đang chuẩn bị tạo ${calculatedScenes} cảnh...` });
 
         const systemPrompt = `You are an expert storyboard creator for AI video generation.
 
@@ -1058,7 +1113,12 @@ Return a JSON array of scenes:
 
         const userPrompt = `Create ${calculatedScenes} scenes for this video idea:\n\n${idea}`;
 
+        event.sender.send('progress-update', { progress: 30, status: `Đang tạo ${calculatedScenes} cảnh storyboard...` });
+
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+        
+        event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý storyboard...' });
+        
         const response = await result.response;
         let text = response.text();
 
@@ -1089,6 +1149,8 @@ Return a JSON array of scenes:
             throw new Error('No valid scenes generated');
         }
 
+        event.sender.send('progress-update', { progress: 95, status: `Hoàn tất ${validScenes.length} cảnh!` });
+
         console.log(`✅ Generated ${validScenes.length} scenes`);
 
         return {
@@ -1098,6 +1160,7 @@ Return a JSON array of scenes:
 
     } catch (error) {
         console.error('Storyboard generation error:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
         return {
             success: false,
             error: error.message || 'Unknown error occurred'
