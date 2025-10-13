@@ -35,7 +35,7 @@ const StoryCreator = () => {
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const [duration, setDuration] = useState(() => loadFromStorage('duration', '2'));
     const [customDuration, setCustomDuration] = useState(() => loadFromStorage('customDuration', ''));
-    const [style, setStyle] = useState(() => loadFromStorage('style', '🎓 Lớp học THCS/THPT'));
+    const [style, setStyle] = useState(() => loadFromStorage('style', '� Hoạt hình Pixar 3D (Mặc định)'));
     const [customStyle, setCustomStyle] = useState(() => loadFromStorage('customStyle', ''));
 
     // Advanced options
@@ -651,7 +651,7 @@ const StoryCreator = () => {
                                         setGeneratedStory('');
                                         setDuration('2');
                                         setCustomDuration('');
-                                        setStyle('🎓 Lớp học THCS/THPT');
+                                        setStyle('� Hoạt hình Pixar 3D (Mặc định)');
                                         setCustomStyle('');
                                         setCustomInstructions('');
 

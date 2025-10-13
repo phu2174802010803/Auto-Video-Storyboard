@@ -199,6 +199,14 @@ ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, style, 
         // Build system instruction based on options
         let systemInstruction = `You are an expert educational video storyboard writer, specializing in creating detailed scene-by-scene scripts for mathematics education videos. Your expertise includes cinematography, visual storytelling, and educational content design.
 
+🎨 MANDATORY STYLE: PIXAR-INSPIRED 3D ANIMATION
+- ALL videos MUST be in Pixar-inspired 3D animated style (NOT live-action, NOT real people)
+- Characters: Animated 3D characters with semi-realistic features, expressive eyes, soft lighting
+- Animation quality: Smooth, natural movements, expressive facial animations
+- Visual style: Colorful, warm, educational-friendly aesthetic similar to Pixar/Disney animations
+- REASON: AI video generators render ANIMATED characters much more consistently than real people
+- NO live-action footage, NO real human actors
+
 CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Runway Gen-3, Pika 2.0):
 
 1. CHARACTER CONSISTENCY:
@@ -247,7 +255,7 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             systemInstruction += ` Maintain strict CONTINUITY: consistent lighting (warm/natural), camera direction (left→right), character positions, and emotional flow across all scenes.`;
         }
 
-        systemInstruction += ` Always write in Vietnamese, design for Vietnamese middle/high school students with red scarves.`;
+        systemInstruction += ` Always write in Vietnamese, design for ANIMATED Vietnamese middle/high school student characters (Pixar 3D style) with red scarves. ALL characters MUST be 3D animated, NOT real people.`;
 
         const model = genAI.getGenerativeModel({
             model: "gemini-2.0-flash-exp",
@@ -291,7 +299,12 @@ ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 Ánh sáng: [tự nhiên qua cửa sổ bên trái, 5200K neutral daylight, bóng đổ hướng nhất quán].
 Âm thanh: [tiếng chim hót nhẹ, giấy xào xạc, bút viết, ambient loop: classroom_soft_ambience].
 Màu sắc: [tông ấm trung tính, palette lớp học Việt Nam].
-Phong cách: ${hideFormulas ? 'Pixar-inspired 3D semi-realistic, geometry-only (không công thức, không chữ)' : 'Pixar-inspired 3D semi-realistic'}.
+🎨 Phong cách BẮT BUỘC: Hoạt hình Pixar 3D (ANIMATED CHARACTERS, NOT REAL PEOPLE)
+  - Nhân vật: Hoạt hình 3D phong cách Pixar/Disney, mắt biểu cảm, ánh sáng mềm
+  - Chất lượng: Chuyển động mượt mà, animation facial tự nhiên
+  - Thẩm mỹ: Màu sắc ấm áp, thân thiện với giáo dục
+  - ${hideFormulas ? 'Geometry-only (không công thức, không chữ)' : 'Full animated style'}
+  - ⚠️ KHÔNG sử dụng người thật, KHÔNG live-action footage
 Tổng thời lượng: ${totalDuration} (${sceneStructure}).
 Timeline metadata: series_id "[TitleSlug]", continuity_mode "strict".
 ${hideFormulas ? 'Không có text, công thức, hoặc số liệu hiển thị trên màn hình — toàn bộ nội dung được thể hiện qua thoại và hành động.' : ''}
@@ -393,6 +406,14 @@ ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceTyp
 
         // Build system instruction based on options
         let systemInstruction = `You are an expert storyboard writer who transforms mathematical articles into detailed video scene scripts with camera angles, lighting, and character actions.
+
+🎨 MANDATORY STYLE: PIXAR-INSPIRED 3D ANIMATION
+- ALL videos MUST be in Pixar-inspired 3D animated style (NOT live-action, NOT real people)
+- Characters: Animated 3D characters with semi-realistic features, expressive eyes, soft lighting
+- Animation quality: Smooth, natural movements, expressive facial animations
+- Visual style: Colorful, warm, educational-friendly aesthetic similar to Pixar/Disney animations
+- REASON: AI video generators render ANIMATED characters much more consistently than real people
+- NO live-action footage, NO real human actors
 
 CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Runway Gen-3, Pika 2.0):
 

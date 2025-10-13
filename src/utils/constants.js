@@ -1,5 +1,6 @@
-// Video Storyboard Styles (29 presets)
+// Video Storyboard Styles (30 presets)
 export const STORY_STYLES = [
+    '🎨 Hoạt hình Pixar 3D (Mặc định)',
     '🎓 Lớp học THCS/THPT',
     '🔬 Phòng thí nghiệm',
     '🌳 Ngoài trời',
