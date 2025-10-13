@@ -249,11 +249,22 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
 - NO numbers written anywhere (e.g., "3", "15", "0.5")
 - NO Vietnamese text on screen (e.g., labels, titles, captions)
 - NO symbols (e.g., "=", "+", "÷", "×", "√")
+- NO mathematical formulas visible in video
+- NO geometric annotations or labels on shapes
+- NO numbers displayed as text
 - REASON: AI video generators (Veo, Sora, Runway) ALWAYS render text/math INCORRECTLY
 - EXAMPLE BAD: "2/3 - (1/2 + 1/3)" written on board → AI renders wrong formula
 - SOLUTION: Character speaks "hai phần ba trừ một nửa cộng một phần ba" while pointing at empty board
-- ALL math content MUST be delivered through DIALOGUE and VISUAL ACTIONS only
-- Use visual representations: show fraction bars, geometric shapes, counting with fingers/objects`;
+- ALL math content MUST be delivered through DETAILED DIALOGUE (voice) and VISUAL ACTIONS only
+- Use visual representations: show fraction bars, geometric shapes, counting with fingers/objects
+
+⚠️ CRITICAL - DIALOGUE REQUIREMENTS:
+- Dialogue MUST be LONG, DETAILED, and COMPREHENSIVE
+- Explain concepts thoroughly like a real teacher would
+- Include: introduction → explanation → examples → reasoning → conclusion
+- Don't worry about dialogue length (user will add voice-over later)
+- Natural, conversational teaching style with complete sentences
+- Multiple exchanges between characters if needed for clarity`;
         }
 
         if (ensureContinuity) {
@@ -347,9 +358,19 @@ Beat plan:
 - 7–10s → Giữ khung freeze – [Mô tả freeze frame]
 
 Camera: [Mid-shot/Close-up/Wide shot, pan/tilt direction]
-Thoại:
-[Tên]: "[Lời thoại tiếng Việt]"
-[Tên]: "[Lời thoại tiếp]"
+
+Thoại (Chi tiết, đầu tư - giúp người xem hiểu rõ):
+[Tên]: "[Lời thoại dài, chi tiết, giải thích kỹ càng - VD: 'Các em chú ý nhé, giờ thầy sẽ giải thích tại sao định lý này quan trọng. Đầu tiên, chúng ta cần hiểu rằng...' - Thoại DÀI OK, không giới hạn độ dài, ưu tiên giúp người xem hiểu]"
+[Tên]: "[Phản hồi chi tiết - VD: 'Dạ em hiểu rồi ạ! Vậy là nếu chúng em áp dụng công thức này vào bài toán thực tế, thì chúng em có thể...' - Thoại tự nhiên, sinh động]"
+[Nếu có thêm người]: "[Tiếp tục đối thoại chi tiết, giải thích, đặt câu hỏi, làm rõ khái niệm...]"
+
+💡 LƯU Ý QUAN TRỌNG VỀ THOẠI:
+- Thoại PHẢI DÀI và CHI TIẾT để giúp người nghe hiểu rõ nội dung
+- Không lo thoại dài (người dùng sẽ ghép thoại vào sau)
+- Giải thích đầy đủ khái niệm, ví dụ, lý do
+- Thoại tự nhiên như giáo viên đang giảng bài thực tế
+- Bao gồm: giới thiệu → giải thích → ví dụ → kết luận
+
 Cảm xúc: [Tò mò/vui vẻ/tập trung...]
 Transition: [Pan/Cut/Fade sang cảnh tiếp]
 
@@ -375,8 +396,13 @@ Beat plan:
 Camera: [Góc quay]
 Action: [Nhân vật làm gì]
 Lighting: [Chất lượng ánh sáng]
-Thoại:
-[Tên]: "[Lời nói]"
+
+Thoại (Chi tiết, đầu tư - giúp người xem hiểu rõ):
+[Tên]: "[Lời thoại dài, chi tiết, giải thích kỹ càng - Ưu tiên nội dung phong phú, không giới hạn độ dài, tự nhiên như giáo viên giảng bài thực tế]"
+[Tên khác]: "[Phản hồi chi tiết, đặt câu hỏi, làm rõ khái niệm...]"
+
+💡 THOẠI: Dài, chi tiết, giải thích đầy đủ (không lo thoại dài, người dùng sẽ ghép vào sau)
+
 Hold instruction: [Giữ khung hình gì]
 Transition: [Chuyển cảnh như thế nào]`}
 
@@ -490,9 +516,18 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
 - NO math expressions (e.g., "2/3 - (1/2 + 1/3)", "a² + b² = c²")
 - NO numbers anywhere (e.g., "3", "0.5", "15")
 - NO text labels (e.g., Vietnamese text, subtitles, captions)
+- NO geometric annotations or shape labels
 - REASON: AI video generators render text/formulas INCORRECTLY
-- SOLUTION: ALL content via DIALOGUE + VISUAL ACTIONS only
-- EXAMPLE: Character says "hai phần ba trừ một nửa" while showing fraction bars visually`;
+- SOLUTION: ALL content via DETAILED DIALOGUE + VISUAL ACTIONS only
+- EXAMPLE: Character says "hai phần ba trừ một nửa" while showing fraction bars visually
+
+⚠️ CRITICAL - DIALOGUE REQUIREMENTS:
+- Dialogue MUST be LONG, DETAILED, and COMPREHENSIVE
+- Explain concepts thoroughly like a real teacher would
+- Include: introduction → explanation → examples → reasoning → conclusion
+- Don't worry about dialogue length (user will add voice-over later)
+- Natural, conversational teaching style
+- Multiple exchanges between characters for better understanding`;
         }
 
         if (ensureContinuity) {
@@ -559,12 +594,14 @@ ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 1. Phân tích nội dung chính của bài viết
 2. Tạo ${sceneStructure} (mỗi cảnh chính 10s, cảnh bridge 3s, tổng ${totalDuration})
 3. 3 giây cuối mỗi cảnh chính: freeze frame để chèn text overlay
-4. ${hideFormulas ? '⛔ CRITICAL - ABSOLUTE BAN: KHÔNG text/số/công thức trên màn hình. VÍ DỤ SAI: "2/3 - (1/2 + 1/3)" viết trên bảng → AI render sai. ĐÚNG: Nhân vật nói "hai phần ba trừ một nửa cộng một phần ba" và chỉ vào bảng trống/vật thể trực quan. Toàn bộ qua THOẠI + HÀNH ĐỘNG TRỰC QUAN.' : 'Có thể có text/công thức nếu cần'}
-5. Mô tả: nhân vật (đeo khăn quàng đỏ), bối cảnh, camera, ánh sáng, hành động
-6. Beat plan chi tiết cho mỗi cảnh
-7. ${ensureContinuity ? 'Đảm bảo continuity: ánh sáng đồng nhất, hướng camera nhất quán, không teleport nhân vật' : 'Chuyển cảnh tự nhiên'}
-8. Phù hợp học sinh THCS/THPT Việt Nam
-9. ⚠️ LƯU Ý QUAN TRỌNG: AI video generators (Veo 3, Sora 2, Runway Gen-3) LUÔN render sai các công thức toán học và chữ số. Thay vào đó, sử dụng biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay/vật thể) và lời thoại.
+4. ${hideFormulas ? '⛔ CRITICAL - ABSOLUTE BAN: KHÔNG text/số/công thức trên màn hình. VÍ DỤ SAI: "2/3 - (1/2 + 1/3)" viết trên bảng → AI render sai. ĐÚNG: Nhân vật nói "hai phần ba trừ một nửa cộng một phần ba" và chỉ vào bảng trống/vật thể trực quan. Toàn bộ qua THOẠI DÀI, CHI TIẾT + HÀNH ĐỘNG TRỰC QUAN.' : 'Có thể có text/công thức nếu cần'}
+5. ⚠️ THOẠI PHẢI DÀI, CHI TIẾT: Giải thích đầy đủ như giáo viên thực tế, không lo thoại dài (người dùng ghép thoại sau), ưu tiên giúp người nghe hiểu rõ nội dung
+6. Mô tả: nhân vật (đeo khăn quàng đỏ), bối cảnh, camera, ánh sáng, hành động
+7. Beat plan chi tiết cho mỗi cảnh
+8. ${ensureContinuity ? 'Đảm bảo continuity: ánh sáng đồng nhất, hướng camera nhất quán, không teleport nhân vật' : 'Chuyển cảnh tự nhiên'}
+9. Phù hợp học sinh THCS/THPT Việt Nam
+10. ⚠️ LƯU Ý QUAN TRỌNG: AI video generators (Veo 3, Sora 2, Runway Gen-3) LUÔN render sai các công thức toán học và chữ số. Thay vào đó, sử dụng biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay/vật thể) và THOẠI DÀI, CHI TIẾT để giải thích.
+11. 🎙️ ĐẦU TƯ THOẠI: Mỗi đoạn thoại phải dài, đầy đủ, giải thích kỹ càng như giáo viên thực tế đang giảng bài. Bao gồm: giới thiệu chủ đề → giải thích khái niệm → đưa ra ví dụ → phân tích → kết luận. Không giới hạn độ dài thoại.
 
 **Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề]"
@@ -915,8 +952,18 @@ Continuity:
   transition_type: "[soft cut/fade/dissolve]"
   maintain_from_previous: "[elements to keep]"
 
-TTS Script:
-  [Character]: "[Dialogue in ${config.language === 'vietnamese' ? 'Vietnamese' : 'English'}]"
+TTS Script (LONG, DETAILED, COMPREHENSIVE):
+  [Character]: "[LONG detailed dialogue explaining the concept thoroughly - Include: introduction, explanation, examples, reasoning, conclusion. Don't worry about length, user will add voice-over later. Example: 'Các em chú ý nhé, giờ thầy sẽ giải thích chi tiết về định lý Pythagore. Đầu tiên, chúng ta cần hiểu rằng định lý này áp dụng cho tam giác vuông. Cụ thể là như thế nào? Trong một tam giác vuông, tổng bình phương của hai cạnh góc vuông sẽ bằng bình phương của cạnh huyền. Tại sao điều này quan trọng? Bởi vì nó giúp chúng ta tính toán độ dài các cạnh một cách chính xác...' - Keep going with full explanation]"
+  [Character 2]: "[DETAILED response or question - Natural conversation style, ask for clarification, provide examples, discuss applications...]"
+  [Continue with multiple exchanges if needed for complete understanding]
+
+💡 CRITICAL - TTS SCRIPT REQUIREMENTS:
+- TTS Script MUST be LONG, DETAILED, COMPREHENSIVE
+- Explain like a real teacher in classroom (full sentences, examples, reasoning)
+- Include: introduction → detailed explanation → concrete examples → analysis → conclusion
+- Don't limit dialogue length (user will handle voice-over timing)
+- Natural teaching conversation with back-and-forth exchanges
+- Each character should contribute meaningfully to understanding
 
 ---
 
@@ -928,9 +975,10 @@ TTS Script:
 5. Character consistency control MUST have DETAILED descriptions
 6. Keep same characters, lighting, and environment throughout ALL scenes
 7. ${config.setupOptions.linkScenes ? 'Link scenes smoothly with continuity metadata' : 'Each scene can be independent'}
-8. NO text overlays, NO subtitles visible in video
-9. Dialogue in TTS Script: ${config.language === 'vietnamese' ? 'Vietnamese only' : 'English only'}
-10. Maintain strict visual consistency across all scenes`;
+8. NO text overlays, NO subtitles, NO numbers, NO formulas visible in video (all visual only)
+9. TTS Script in ${config.language === 'vietnamese' ? 'Vietnamese' : 'English'}: LONG, DETAILED, COMPREHENSIVE dialogue
+10. Maintain strict visual consistency across all scenes
+11. 🎙️ INVEST IN TTS SCRIPT: Long explanations help viewers understand better, don't worry about length`;
 
         // Build user prompt
         let userPrompt = '';
