@@ -170,7 +170,13 @@ ipcMain.handle('generate-content-summary', async (event, { apiKey, content, sour
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.0-flash-exp",
+            generationConfig: {
+                maxOutputTokens: 16384,  // Increase for comprehensive 9-part analysis
+                temperature: 0.7
+            }
+        });
 
         // Use more content for detailed analysis
         let analysisContent = content;
@@ -178,45 +184,149 @@ ipcMain.handle('generate-content-summary', async (event, { apiKey, content, sour
             analysisContent = content.substring(0, 30000) + '\n\n[Nội dung tiếp theo...]';
         }
 
-        const prompt = `Bạn là chuyên gia phân tích nội dung giáo dục toán học, chuyên tạo storyboard video.
+        const prompt = `Bạn là chuyên gia phân tích nội dung giáo dục toán học, chuyên sâu về sư phạm và thiết kế bài giảng hiệu quả.
 
-Hãy PHÂN TÍCH CHI TIẾT nội dung sau đây để giúp người dùng có cái nhìn toàn diện trước khi tạo storyboard:
+🎯 NHIỆM VỤ: Phân tích TOÀN DIỆN nội dung file học liệu theo chuẩn sư phạm 9 phần
+
+**NỘI DUNG CẦN PHÂN TÍCH:**
 
 ${analysisContent}
 
-📋 YÊU CẦU PHÂN TÍCH:
+---
 
-**1. Tổng quan nội dung (2-3 câu)**
-   - Chủ đề chính và mục tiêu học tập
-   - Đối tượng học sinh (cấp độ, lớp)
+📋 CHUẨN ĐẦU RA - PHÂN TÍCH THEO 9 PHẦN SAU:
 
-**2. Cấu trúc kiến thức**
-   - Các phần chính và logic liên kết
-   - Thứ tự trình bày (từ cơ bản → nâng cao)
-   - Điểm nhấn quan trọng
+## 1️⃣ Giới thiệu tổng quan bài học 🎯
 
-**3. Khái niệm & Công thức**
-   - Liệt kê các khái niệm toán học chính
-   - Công thức quan trọng (nếu có)
-   - Định lý, tính chất cần nhấn mạnh
+Tóm tắt ngắn gọn:
+- Tên bài học, lớp học, chủ đề chương
+- Mục tiêu chính của bài (học sinh sẽ nắm được gì, làm được gì)
+- Đối tượng người học (ví dụ: học sinh lớp 8)
+- Mục tiêu sư phạm cụ thể
 
-**4. Ví dụ & Bài tập**
-   - Các ví dụ minh họa
-   - Dạng bài tập thực hành
-   - Ứng dụng thực tế (nếu có)
+Ví dụ: "Bài học giúp học sinh củng cố kiến thức về hình chóp đều, nhận biết các yếu tố cấu tạo, và áp dụng công thức tính diện tích – thể tích trong các tình huống thực tế."
 
-**5. Đề xuất cho Storyboard**
-   - Góc độ kể chuyện phù hợp
-   - Visual suggestions (hình ảnh, animation nào)
-   - Điểm cần diễn giải rõ ràng
-   - Phần nào cần ví dụ trực quan
+---
 
-**6. Lưu ý đặc biệt**
-   - Điểm khó, dễ nhầm lẫn
-   - Phần cần nhấn mạnh
-   - Kết nối với kiến thức trước/sau
+## 2️⃣ Cấu trúc và logic sư phạm của bài học 🧱
 
-Format: Markdown với emoji, rõ ràng, dễ đọc. Phân tích đầy đủ, chi tiết.`;
+Nhận ra và mô tả bố cục bài dạy theo trình tự logic giáo dục:
+- **Phần khởi động:** Tạo hứng thú, kiểm tra kiến thức cũ
+- **Phần kiến thức mới:** Ôn tập lý thuyết, giới thiệu khái niệm
+- **Phần luyện tập:** Bài tập áp dụng
+- **Phần vận dụng:** Bài toán thực tế
+- **Phần củng cố:** Tổng kết, hướng dẫn về nhà
+
+Chỉ rõ:
+- Mục tiêu từng phần
+- Hoạt động tương ứng (trò chơi, câu hỏi, nhóm thảo luận, bài tập)
+- Cách liên kết giữa các phần
+
+---
+
+## 3️⃣ Nội dung kiến thức trọng tâm 📘
+
+Trích lọc TOÀN BỘ kiến thức chính:
+- **Định nghĩa và tính chất** quan trọng
+- **Yếu tố cấu tạo** (ví dụ: đỉnh, mặt, cạnh, đường cao)
+- **Đặc điểm nhận biết** (ví dụ: hình chóp đều có các cạnh bên bằng nhau)
+- **Điều kiện áp dụng**
+- **Điểm dễ nhầm lẫn**, lỗi sai học sinh hay gặp
+
+Ví dụ: "Hình chóp tam giác đều có đáy là tam giác đều, các mặt bên là tam giác cân tại đỉnh S, đường cao hạ từ S vuông góc với trọng tâm đáy."
+
+---
+
+## 4️⃣ Hệ thống công thức và mối liên hệ ➗
+
+Trích RA MỌI CÔNG THỨC xuất hiện:
+- Viết lại dưới dạng chuẩn (ký hiệu toán học đúng)
+- **Giải thích ý nghĩa** từng ký hiệu
+- **Nêu mối liên hệ** giữa các công thức
+- **Điều kiện áp dụng** từng công thức
+
+Ví dụ:
+- Diện tích xung quanh: S_xq = (1/2) × P_đáy × l
+- Thể tích: V = (1/3) × S_đáy × h
+- Giải thích: l là độ dài cạnh bên, h là đường cao từ đỉnh
+
+---
+
+## 5️⃣ Bài tập, ví dụ và ứng dụng thực tế 📝
+
+Liệt kê CHI TIẾT:
+- **Các dạng bài tập:** Trắc nghiệm, tự luận, bài toán thực tế
+- **Tóm tắt đề bài:** Yêu cầu, dữ kiện, công thức cần dùng
+- **Ý nghĩa thực tế:** Nếu có bài toán thực tế (chậu cây, túi quà, mái nhà...)
+- **Phân loại độ khó:** Nhận biết, thông hiểu, vận dụng, vận dụng cao
+
+Ví dụ:
+- Bài 1: Hộp quà hình chóp tứ giác đều – tính thể tích và diện tích giấy cần
+- Bài 2: Chậu cây hình chóp tam giác đều – tính thể tích và chi phí sơn
+
+---
+
+## 6️⃣ Hệ thống hóa kiến thức - Ghi nhớ nhanh ✍️
+
+Tổng hợp kiến thức thành **GHI NHỚ NHANH:**
+- Đặc điểm nhận biết quan trọng
+- Các công thức cần thuộc lòng
+- Mối quan hệ giữa các đại lượng
+- Cách tính nhanh, mẹo nhớ
+
+Ví dụ:
+- "Hình chóp đều: đáy là đa giác đều, cạnh bên bằng nhau, đường cao đi qua tâm đáy"
+- "Thể tích = (1/3) × diện tích đáy × chiều cao"
+
+---
+
+## 7️⃣ Phân tích mức độ nhận thức Bloom 🎓
+
+Chia các phần theo mức độ tư duy:
+
+| Mức độ | Hoạt động trong bài |
+|--------|---------------------|
+| **Nhận biết** | Nhận dạng hình, chọn đúng/sai |
+| **Thông hiểu** | Giải thích khái niệm, nhắc lại tính chất |
+| **Vận dụng** | Giải bài tập tính toán cơ bản |
+| **Vận dụng cao** | Giải bài toán thực tế phức tạp |
+
+---
+
+## 8️⃣ Gợi ý storyboard hóa / thiết kế video 🎬
+
+Đưa ra GỢI Ý CỤ THỂ:
+- **Cách thể hiện hình ảnh:** Mô hình 3D, animation, highlight
+- **Nhân vật và thoại:** Ai nói gì, ở cảnh nào
+- **Cách nhấn mạnh khái niệm:** Visual, màu sắc, chuyển động
+- **Hoạt động tương tác:** Thí nghiệm, đo đạc, vẽ hình
+
+Ví dụ:
+- "Dùng mô hình 3D minh họa quá trình rót cát vào hình chóp để hiểu công thức V = (1/3)Sh"
+- "Nam và Linh cùng làm thí nghiệm đo chiều cao hình chóp bằng thước và mô hình giấy"
+
+---
+
+## 9️⃣ Kết luận & Hướng dẫn học sinh về nhà 🏡
+
+Kết thúc bằng:
+- **Tóm tắt 3-5 ý chính** cần nhớ
+- **Gợi ý chuẩn bị bài mới**
+- **Phần dặn dò** (nếu có trong file)
+
+Ví dụ:
+- "Ôn lại công thức tính thể tích và diện tích hình chóp"
+- "Chuẩn bị bài mới: Hình chóp cụt và các hình không gian khác"
+
+---
+
+🎯 FORMAT ĐẦU RA:
+- Markdown với emoji phân cấp rõ ràng
+- Văn bản tự nhiên, mạch lạc, dễ hiểu
+- Đầy đủ 9 phần như trên
+- Chi tiết, cụ thể, có ví dụ minh họa
+
+HÃY PHÂN TÍCH THEO ĐÚNG 9 PHẦN TRÊN!`;
 
         // Use retry logic for rate limit handling
         const analysisResult = await retryWithBackoff(async () => {
