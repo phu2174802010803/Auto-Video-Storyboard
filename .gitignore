@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+dist-electron/
+release/
+out/
+build/
+
+# Development logs
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.local
+
+# Cache
+.cache/
+.eslintcache
+
+# Electron builds
+*.exe
+*.dmg
+*.app
+*.AppImage
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# API Keys & Cookies (bảo mật)
+Cookie.txt
+
+# IDE
+.vscode/
+.idea/
