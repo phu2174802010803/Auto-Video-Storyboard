@@ -1491,11 +1491,11 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
         // Use selected model with fallback to default
         const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
-        // CRITICAL: Increase output tokens to prevent truncation
+        // CRITICAL: Max output tokens to prevent truncation for long storyboards
         const model = genAI.getGenerativeModel({
             model: modelToUse,
             generationConfig: {
-                maxOutputTokens: 8192,  // Increased from default 2048
+                maxOutputTokens: 65536,  // Maximum for Gemini 2.5 models (was 8192 - caused truncation)
                 temperature: 0.7,
             }
         });
@@ -1666,8 +1666,9 @@ TTS Script:
 **CRITICAL RULES:**
 1. Output as formatted TEXT with emoji headers, NOT JSON
 2. Generate SETTING CHUNG only ONCE at the beginning
-3. Generate one 🎞️ PROMPT block for EACH scene (6-10 scenes typical)
-4. Keep Vietnamese language natural and educational
+3. ⚠️ **MUST GENERATE PROMPTS FOR ALL SCENES** - If storyboard has 12 scenes, output MUST contain 12 complete 🎞️ PROMPT blocks. DO NOT stop early!
+4. Generate one 🎞️ PROMPT block for EACH scene (complete ALL scenes in the storyboard)
+5. Keep Vietnamese language natural and educational
 5. All dialogue in TTS Script must be in Vietnamese
 6. No English in output except section labels
 7. **CHARACTER CONSISTENCY (CRITICAL)**: 
@@ -1712,6 +1713,16 @@ TTS Script:
 
         console.log('✅ Structured prompts generated');
         console.log(`📊 Output length: ${text.length} characters`);
+
+        // Verify all scenes were generated
+        const sceneMatches = text.match(/🎞️.*PROMPT.*Scene/gi);
+        const sceneCount = sceneMatches ? sceneMatches.length : 0;
+        console.log(`📝 Generated ${sceneCount} scene prompts`);
+        
+        // Warning if scene count seems low (but don't block - let user decide)
+        if (sceneCount < 5) {
+            console.warn(`⚠️ Warning: Only ${sceneCount} scenes generated. Output may be truncated.`);
+        }
 
         event.sender.send('progress-update', { progress: 100, status: 'Hoàn tất tạo prompts!' });
 
