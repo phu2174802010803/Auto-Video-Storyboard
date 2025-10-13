@@ -8,7 +8,8 @@ Auto-Video-Storyboard/
 ├── main (production)              [v1.0.0] ⭐
 │   └── 0c9dcc7 - Initial commit
 │
-└── develop (development)          [3 commits ahead] 🚀
+└── develop (development)          [4 commits ahead] 🚀
+    ├── 2055cb1 - GitFlow visual diagrams
     ├── 16eadb1 - Git setup complete
     ├── 6aedc27 - Quick start guide
     ├── 40fc00b - GitFlow guide

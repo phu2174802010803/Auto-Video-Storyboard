@@ -1,153 +1,304 @@
-# 🎬 Auto Video Storyboard# 🎬 Auto Veo Video - AI Storyboard Generator
+# 🎬 Auto Video Storyboard# 🎬 Auto Video Storyboard# 🎬 Auto Veo Video - AI Storyboard Generator
 
 
 
-Ứng dụng desktop tự động tạo storyboard và video prompts sử dụng AI (Google Gemini) cho sản xuất video chuyên nghiệp.Ứng dụng desktop tạo storyboard video giáo dục toán học sử dụng Google Gemini AI.
+Ứng dụng desktop tự động tạo storyboard và video prompts sử dụng AI (Google Gemini) cho sản xuất video chuyên nghiệp.
 
 
 
-## ✨ Tính năng## ✨ Tính năng
+## ✨ Tính năngỨng dụng desktop tự động tạo storyboard và video prompts sử dụng AI (Google Gemini) cho sản xuất video chuyên nghiệp.Ứng dụng desktop tạo storyboard video giáo dục toán học sử dụng Google Gemini AI.
 
 
 
-### 📝 Quản lý Storyboard- 🎬 **Tạo Storyboard từ Ý tưởng**: Chuyển đổi ý tưởng thành storyboard chi tiết
+### 📝 Quản lý Storyboard
 
-- ✅ Tạo và quản lý nhiều storyboard- 🔗 **Tạo từ URL**: Biến bài viết toán học thành kịch bản video
+- ✅ Tạo và quản lý nhiều storyboard
 
-- ✅ Chỉnh sửa, xóa storyboard dễ dàng- 🎨 **29 Phong cách**: Lớp học, Phòng thí nghiệm, Ngoài trời, Hoạt hình 2D, v.v.
+- ✅ Chỉnh sửa, xóa storyboard dễ dàng## ✨ Tính năng## ✨ Tính năng
 
-- ✅ Lưu trữ tự động vào localStorage- ⚙️ **Tùy chỉnh nâng cao**: Bridge scenes, GEOMETRY-ONLY, Continuity control
+- ✅ Lưu trữ tự động vào localStorage
 
-- 📚 **Quản lý Lịch sử**: Lưu trữ và tìm kiếm storyboard
+
 
 ### 🤖 Tạo Video Prompts với AI
 
-- ✅ Tích hợp Google Gemini AI (gemini-2.0-flash-exp)## 🛠️ Công nghệ
+- ✅ Tích hợp Google Gemini AI (gemini-2.0-flash-exp)### 📝 Quản lý Storyboard- 🎬 **Tạo Storyboard từ Ý tưởng**: Chuyển đổi ý tưởng thành storyboard chi tiết
 
 - ✅ Tự động phân tích storyboard thành scenes
 
-- ✅ Tạo prompts chi tiết cho từng cảnh- **Frontend**: React 18 + Vite
+- ✅ Tạo prompts chi tiết cho từng cảnh- ✅ Tạo và quản lý nhiều storyboard- 🔗 **Tạo từ URL**: Biến bài viết toán học thành kịch bản video
 
-- ✅ Hiển thị Setting Chung + từng Scene riêng biệt- **Desktop**: Electron 28
+- ✅ Hiển thị Setting Chung + từng Scene riêng biệt
 
-- ✅ Copy từng section hoặc export toàn bộ- **AI**: Google Gemini 2.0 Flash
+- ✅ Copy từng section hoặc export toàn bộ- ✅ Chỉnh sửa, xóa storyboard dễ dàng- 🎨 **29 Phong cách**: Lớp học, Phòng thí nghiệm, Ngoài trời, Hoạt hình 2D, v.v.
 
-- **Styling**: Custom CSS với Dark Theme
 
-### 📜 Lịch sử & Quản lý
 
-- ✅ Lưu lịch sử tất cả prompts đã tạo## 📦 Cài đặt
+### 📜 Lịch sử & Quản lý- ✅ Lưu trữ tự động vào localStorage- ⚙️ **Tùy chỉnh nâng cao**: Bridge scenes, GEOMETRY-ONLY, Continuity control
 
-- ✅ Bộ lọc theo thời gian (Hôm nay / 7 ngày / 30 ngày)
+- ✅ Lưu lịch sử tất cả prompts đã tạo
 
-- ✅ Tải lại prompts từ lịch sử```bash
+- ✅ Bộ lọc theo thời gian (Hôm nay / 7 ngày / 30 ngày)- 📚 **Quản lý Lịch sử**: Lưu trữ và tìm kiếm storyboard
 
-- ✅ Preview nội dung prompts# Install dependencies
+- ✅ Tải lại prompts từ lịch sử
 
-npm install
+- ✅ Preview nội dung prompts### 🤖 Tạo Video Prompts với AI
 
-### ⚙️ Cài đặt
 
-- ✅ Quản lý Google Gemini API Key# Run in development mode
 
-- ✅ Giao diện tối (Dark Mode)npm run electron:dev
+### ⚙️ Cài đặt- ✅ Tích hợp Google Gemini AI (gemini-2.0-flash-exp)## 🛠️ Công nghệ
+
+- ✅ Quản lý Google Gemini API Key
+
+- ✅ Giao diện tối (Dark Mode)- ✅ Tự động phân tích storyboard thành scenes
 
 - ✅ Thông báo Toast messages
 
-# Build for production
+- ✅ Tạo prompts chi tiết cho từng cảnh- **Frontend**: React 18 + Vite
 
-## 🚀 Công nghệnpm run electron:build
+## 🚀 Công nghệ
 
-```
+- ✅ Hiển thị Setting Chung + từng Scene riêng biệt- **Desktop**: Electron 28
 
 - **Frontend**: React 18 + Vite
 
-- **Desktop**: Electron## 🔑 Cấu hình
+- **Desktop**: Electron- ✅ Copy từng section hoặc export toàn bộ- **AI**: Google Gemini 2.0 Flash
 
 - **AI**: Google Gemini API
 
-- **Styling**: CSS Variables (Dark Theme)1. Lấy API Key miễn phí tại: [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **Styling**: CSS Variables (Dark Theme)- **Styling**: Custom CSS với Dark Theme
 
-- **State Management**: React Context API2. Mở ứng dụng và vào phần **Cài đặt**
+- **State Management**: React Context API
 
-3. Nhập API Key và lưu
+### 📜 Lịch sử & Quản lý
 
 ## 📦 Cài đặt
 
-## 📖 Hướng dẫn sử dụng
+- ✅ Lưu lịch sử tất cả prompts đã tạo## 📦 Cài đặt
 
 ### Yêu cầu hệ thống
 
-- Node.js 16+1. Lấy API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Node.js 16+- ✅ Bộ lọc theo thời gian (Hôm nay / 7 ngày / 30 ngày)
 
-- npm hoặc yarn2. Mở ứng dụng, vào **Cài đặt** và nhập API Key
+- npm hoặc yarn
 
-3. Chọn tab **Từ Ý tưởng** hoặc **Từ URL**
+- ✅ Tải lại prompts từ lịch sử```bash
 
-### Clone repository4. Nhập nội dung và chọn tùy chọn
+### Clone repository
 
-```bash5. Nhấn **Tạo Storyboard**
+```bash- ✅ Preview nội dung prompts# Install dependencies
 
-git clone https://github.com/phu2174802010803/Auto-Video-Storyboard.git6. Sao chép hoặc lưu kết quả
+git clone https://github.com/phu2174802010803/Auto-Video-Storyboard.git
 
-cd Auto-Video-Storyboard
+cd Auto-Video-Storyboardnpm install
 
-```## 📂 Cấu trúc Project
+```
+
+### ⚙️ Cài đặt
+
+### Cài đặt dependencies
+
+```bash- ✅ Quản lý Google Gemini API Key# Run in development mode
+
+npm install
+
+```- ✅ Giao diện tối (Dark Mode)npm run electron:dev
 
 
 
-### Cài đặt dependencies```
+### Cấu hình API Key- ✅ Thông báo Toast messages
 
-```bashAuto Veo Video/
+1. Lấy API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-npm install├── electron/           # Electron main & preload
+2. Mở ứng dụng và vào tab "⚙️ Cài đặt"# Build for production
 
-```│   ├── main.js
+3. Nhập Google Gemini API Key
 
-│   └── preload.js
+4. Key được lưu tự động trong localStorage## 🚀 Công nghệnpm run electron:build
 
-### Cấu hình API Key├── src/
 
-1. Lấy API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)│   ├── components/    # React components
+
+## 🎯 Sử dụng```
+
+
+
+### Development mode- **Frontend**: React 18 + Vite
+
+```bash
+
+npm run dev              # Chỉ chạy React dev server- **Desktop**: Electron## 🔑 Cấu hình
+
+npm run electron:dev     # Chạy Electron app với hot reload
+
+```- **AI**: Google Gemini API
+
+
+
+### Build production- **Styling**: CSS Variables (Dark Theme)1. Lấy API Key miễn phí tại: [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+```bash
+
+npm run build            # Build React app- **State Management**: React Context API2. Mở ứng dụng và vào phần **Cài đặt**
+
+npm run electron:build   # Build Electron executable
+
+```3. Nhập API Key và lưu
+
+
+
+## 📁 Cấu trúc dự án## 📦 Cài đặt
+
+
+
+```## 📖 Hướng dẫn sử dụng
+
+Auto-Video-Storyboard/
+
+├── electron/              # Electron main process### Yêu cầu hệ thống
+
+│   ├── main.js           # Main process & IPC handlers
+
+│   └── preload.js        # Preload script- Node.js 16+1. Lấy API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+├── src/
+
+│   ├── components/       # React components- npm hoặc yarn2. Mở ứng dụng, vào **Cài đặt** và nhập API Key
+
+│   │   ├── StoryboardManager.jsx
+
+│   │   ├── PromptGenerator.jsx3. Chọn tab **Từ Ý tưởng** hoặc **Từ URL**
+
+│   │   └── Settings.jsx
+
+│   ├── context/          # React Context### Clone repository4. Nhập nội dung và chọn tùy chọn
+
+│   │   ├── AppContext.jsx
+
+│   │   └── ToastContext.jsx```bash5. Nhấn **Tạo Storyboard**
+
+│   ├── utils/            # Utilities
+
+│   ├── App.jsx           # Main App componentgit clone https://github.com/phu2174802010803/Auto-Video-Storyboard.git6. Sao chép hoặc lưu kết quả
+
+│   └── main.jsx          # React entry point
+
+├── public/               # Static assetscd Auto-Video-Storyboard
+
+├── package.json
+
+├── vite.config.js        # Vite configuration```## 📂 Cấu trúc Project
+
+└── README.md
+
+```
+
+
+
+## 🌿 GitFlow Workflow### Cài đặt dependencies```
+
+
+
+Dự án sử dụng GitFlow standard:```bashAuto Veo Video/
+
+
+
+### Nhánh chínhnpm install├── electron/           # Electron main & preload
+
+- **`main`**: Phiên bản ổn định, production-ready
+
+- **`develop`**: Nhánh phát triển, tích hợp features```│   ├── main.js
+
+
+
+### Quy trình phát triển│   └── preload.js
+
+
+
+Xem chi tiết tại:### Cấu hình API Key├── src/
+
+- 📘 **GITFLOW_GUIDE.md** - Hướng dẫn chi tiết workflow
+
+- 📗 **GITFLOW_DIAGRAM.md** - Visual diagrams1. Lấy API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)│   ├── components/    # React components
+
+- 📖 **QUICK_START.md** - Quick reference commands
 
 2. Mở ứng dụng và vào tab "⚙️ Cài đặt"│   │   ├── Header.jsx
 
+## 📝 Changelog
+
 3. Nhập Google Gemini API Key│   │   ├── Sidebar.jsx
 
-4. Key được lưu tự động trong localStorage│   │   ├── StoryCreator.jsx
+### Version 1.0.0 (Initial Release)
 
-│   │   ├── StoryHistory.jsx
+- ✅ Quản lý storyboard cơ bản4. Key được lưu tự động trong localStorage│   │   ├── StoryCreator.jsx
 
-## 🎯 Sử dụng│   │   └── Settings.jsx
+- ✅ Tạo video prompts với Gemini AI
 
-│   ├── context/       # React contexts
+- ✅ Lịch sử và bộ lọc│   │   ├── StoryHistory.jsx
 
-### Development mode│   │   ├── AppContext.jsx
+- ✅ Cài đặt API Key
 
-```bash│   │   └── ToastContext.jsx
-
-npm run dev              # Chỉ chạy React dev server│   ├── utils/         # Utilities
-
-npm run electron:dev     # Chạy Electron app với hot reload│   │   └── constants.js
-
-```│   ├── App.jsx
-
-│   ├── main.jsx
-
-### Build production│   └── index.css
-
-```bash├── package.json
-
-npm run build            # Build React app├── vite.config.js
-
-npm run electron:build   # Build Electron executable└── index.html
-
-``````
+- ✅ Giao diện Dark Mode## 🎯 Sử dụng│   │   └── Settings.jsx
 
 
 
-## 📁 Cấu trúc dự án
+## 🤝 Contributing│   ├── context/       # React contexts
 
+
+
+1. Fork repository### Development mode│   │   ├── AppContext.jsx
+
+2. Tạo feature branch từ `develop`
+
+3. Commit với message rõ ràng```bash│   │   └── ToastContext.jsx
+
+4. Push lên branch
+
+5. Tạo Pull Request vào `develop`npm run dev              # Chỉ chạy React dev server│   ├── utils/         # Utilities
+
+
+
+Xem chi tiết quy trình tại **GITFLOW_GUIDE.md**npm run electron:dev     # Chạy Electron app với hot reload│   │   └── constants.js
+
+
+
+## 📄 License```│   ├── App.jsx
+
+
+
+MIT License│   ├── main.jsx
+
+
+
+## 🔗 Links### Build production│   └── index.css
+
+
+
+- **Repository**: https://github.com/phu2174802010803/Auto-Video-Storyboard```bash├── package.json
+
+- **Issues**: https://github.com/phu2174802010803/Auto-Video-Storyboard/issues
+
+- **Google Gemini API**: https://ai.google.dev/npm run build            # Build React app├── vite.config.js
+
+
+
+## 👨‍💻 Authornpm run electron:build   # Build Electron executable└── index.html
+
+
+
+**Phu Chu**``````
+
+- Email: phu.2174802010803@vanlanguni.vn
+
+- GitHub: [@phu2174802010803](https://github.com/phu2174802010803)
+
+
+
+---## 📁 Cấu trúc dự án
+
+
+
+⭐ Nếu dự án hữu ích, hãy cho một star nhé!
 
 
 ```## 📝 License
