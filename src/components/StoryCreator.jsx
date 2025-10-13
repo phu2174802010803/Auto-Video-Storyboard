@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { STORY_STYLES, WORD_COUNT_PRESETS } from '../utils/constants';
+import { STORY_STYLES, VIDEO_DURATION_PRESETS } from '../utils/constants';
 import './StoryCreator.css';
 
 const StoryCreator = () => {
@@ -33,8 +33,8 @@ const StoryCreator = () => {
     const [urlIdea, setUrlIdea] = useState(() => loadFromStorage('urlIdea', ''));
     const [showSummary, setShowSummary] = useState(() => loadFromStorage('showSummary', true));
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-    const [wordCount, setWordCount] = useState(() => loadFromStorage('wordCount', '1000'));
-    const [customWordCount, setCustomWordCount] = useState(() => loadFromStorage('customWordCount', ''));
+    const [duration, setDuration] = useState(() => loadFromStorage('duration', '2'));
+    const [customDuration, setCustomDuration] = useState(() => loadFromStorage('customDuration', ''));
     const [style, setStyle] = useState(() => loadFromStorage('style', '🎓 Lớp học THCS/THPT'));
     const [customStyle, setCustomStyle] = useState(() => loadFromStorage('customStyle', ''));
 
@@ -47,7 +47,16 @@ const StoryCreator = () => {
     const [loading, setLoading] = useState(false);
     const [generatedStory, setGeneratedStory] = useState(() => loadFromStorage('generatedStory', ''));
 
-    const finalWordCount = wordCount === 'custom' ? customWordCount : wordCount;
+    // Calculate word count from duration
+    const getWordCountFromDuration = (dur) => {
+        const preset = VIDEO_DURATION_PRESETS.find(p => p.value === dur);
+        return preset ? preset.words : parseInt(dur) * 500; // 500 words per minute for custom
+    };
+
+    const finalDuration = duration === 'custom' ? customDuration : duration;
+    const finalWordCount = duration === 'custom' 
+        ? parseInt(customDuration) * 500 
+        : getWordCountFromDuration(duration);
     const finalStyle = style === '✨ Tùy chỉnh' ? customStyle : style;
 
     // Save to localStorage whenever state changes
@@ -64,12 +73,12 @@ const StoryCreator = () => {
     }, [url]);
 
     useEffect(() => {
-        localStorage.setItem('storyboard-wordCount', JSON.stringify(wordCount));
-    }, [wordCount]);
+        localStorage.setItem('storyboard-duration', JSON.stringify(duration));
+    }, [duration]);
 
     useEffect(() => {
-        localStorage.setItem('storyboard-customWordCount', JSON.stringify(customWordCount));
-    }, [customWordCount]);
+        localStorage.setItem('storyboard-customDuration', JSON.stringify(customDuration));
+    }, [customDuration]);
 
     useEffect(() => {
         localStorage.setItem('storyboard-style', JSON.stringify(style));
@@ -231,8 +240,8 @@ const StoryCreator = () => {
             return false;
         }
 
-        if (wordCount === 'custom' && !customWordCount) {
-            warning('Vui lòng nhập số từ tùy chỉnh');
+        if (duration === 'custom' && !customDuration) {
+            warning('Vui lòng nhập thời lượng tùy chỉnh');
             return false;
         }
 
@@ -527,24 +536,27 @@ const StoryCreator = () => {
 
                     <div className="input-row">
                         <div className="input-group">
-                            <label>Số từ</label>
-                            <select value={wordCount} onChange={(e) => setWordCount(e.target.value)}>
-                                {WORD_COUNT_PRESETS.map(wc => (
-                                    <option key={wc.value} value={wc.value}>{wc.label}</option>
+                            <label>⏱️ Thời lượng video</label>
+                            <select value={duration} onChange={(e) => setDuration(e.target.value)}>
+                                {VIDEO_DURATION_PRESETS.map(preset => (
+                                    <option key={preset.value} value={preset.value}>{preset.label}</option>
                                 ))}
-                                <option value="custom">Tùy chỉnh</option>
+                                <option value="custom">⚙️ Tùy chỉnh</option>
                             </select>
-                            {wordCount === 'custom' && (
+                            {duration === 'custom' && (
                                 <input
                                     type="number"
-                                    value={customWordCount}
-                                    onChange={(e) => setCustomWordCount(e.target.value)}
-                                    placeholder="Nhập số từ"
-                                    min="100"
-                                    max="50000"
+                                    value={customDuration}
+                                    onChange={(e) => setCustomDuration(e.target.value)}
+                                    placeholder="Nhập số phút (1-60)"
+                                    min="1"
+                                    max="60"
                                     className="custom-input"
                                 />
                             )}
+                            <p className="input-hint">
+                                📊 Độ dài storyboard: ~{finalWordCount} từ
+                            </p>
                         </div>
 
                         <div className="input-group">
@@ -637,8 +649,8 @@ const StoryCreator = () => {
                                         setUrlIdea('');
                                         setShowSummary(true);
                                         setGeneratedStory('');
-                                        setWordCount('1000');
-                                        setCustomWordCount('');
+                                        setDuration('2');
+                                        setCustomDuration('');
                                         setStyle('🎓 Lớp học THCS/THPT');
                                         setCustomStyle('');
                                         setCustomInstructions('');
@@ -652,8 +664,8 @@ const StoryCreator = () => {
                                         localStorage.removeItem('storyboard-fileName');
                                         localStorage.removeItem('storyboard-contentSummary');
                                         localStorage.removeItem('storyboard-showSummary');
-                                        localStorage.removeItem('storyboard-wordCount');
-                                        localStorage.removeItem('storyboard-customWordCount');
+                                        localStorage.removeItem('storyboard-duration');
+                                        localStorage.removeItem('storyboard-customDuration');
                                         localStorage.removeItem('storyboard-style');
                                         localStorage.removeItem('storyboard-customStyle');
                                         localStorage.removeItem('storyboard-customInstructions');

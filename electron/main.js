@@ -197,7 +197,33 @@ ipcMain.handle('generate-story-from-idea', async (event, { apiKey, idea, style, 
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // Build system instruction based on options
-        let systemInstruction = `You are an expert educational video storyboard writer, specializing in creating detailed scene-by-scene scripts for mathematics education videos. Your expertise includes cinematography, visual storytelling, and educational content design.`;
+        let systemInstruction = `You are an expert educational video storyboard writer, specializing in creating detailed scene-by-scene scripts for mathematics education videos. Your expertise includes cinematography, visual storytelling, and educational content design.
+
+CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Runway Gen-3, Pika 2.0):
+
+1. CHARACTER CONSISTENCY:
+   - Describe characters in PIXAR-LEVEL DETAIL (age, face shape, eyes color/size, nose, mouth, skin tone, hair style/color/texture, height, build, outfit details, personality traits)
+   - Use reference tags: [CharacterName]_consistent
+   - Example: "Nam, 12 tuổi, mặt tròn, mắt nâu to sáng, mũi nhỏ, nụ cười rạng rỡ, da sáng Việt Nam, tóc đen ngắn chải gọn, chiều cao trung bình 145cm, dáng người gầy khỏe mạnh, áo trắng tay ngắn, quần xanh navy, khăn đỏ, giày thể thao trắng, năng lượng cao, tò mò"
+   - ALL characters MUST maintain EXACT SAME appearance across ALL scenes
+
+2. ENVIRONMENT CONTROL:
+   - Lighting: temperature_kelvin 5200 (neutral daylight), consistent shadow direction
+   - Background: maintain same layout, props, furniture across scenes
+   - Color palette: warm neutral tones
+   - Props persistence: objects don't disappear/appear randomly
+
+3. AUDIO CONTINUITY:
+   - Ambient loop: consistent background sound throughout
+   - Crossfade: 0.8s between scenes
+   - Volume ratio: speech 0.85 / ambience 0.15
+   - Microphone: lapel simulation for natural voice
+
+4. TIMELINE METADATA:
+   - Link scenes with timeline_id
+   - Specify scene_number, previous_scene, next_scene
+   - Transition type: soft cut/match action/fade/dissolve
+   - Maintain elements: character positions, lighting angle, desk arrangement`;
 
         if (addBridgeScenes) {
             systemInstruction += ` You create storyboards with MAIN SCENES and BRIDGE SCENES for smooth transitions between locations/actions. Bridge scenes are short (3s) connecting scenes.`;
@@ -237,16 +263,27 @@ ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 **Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề hấp dẫn]"
 
-👥 Nhân vật:
-[Tên]: [Học sinh nam/nữ THCS, đeo khăn quàng đỏ, áo đồng phục, tính cách...]
-[Tên]: [Mô tả tương tự...]
+👥 Nhân vật (MÔ TẢ CHI TIẾT PIXAR-LEVEL để AI tái tạo đúng):
+[Tên]: [reference_tag: [Name]_consistent]
+  • Tuổi: [12 tuổi]
+  • Khuôn mặt: [tròn/vuông/oval], mắt [màu nâu/đen, to/nhỏ, biểu cảm gì], mũi [nhỏ/cao/tẹt], miệng [nụ cười rộng/nhỏ], da [sáng/ngăm đen], điểm đặc biệt [má lúm đồng tiền/vết chàm/...]
+  • Tóc: [đen/nâu], [ngắn gọn/dài vai], [thẳng/xoăn], [chi tiết: chải ngôi giữa/buộc đuôi gà/...]
+  • Thân hình: chiều cao [145cm/150cm/...], dáng [gầy/mập/khỏe], tư thế [tự tin/nhút nhát]
+  • Trang phục: áo [trắng tay ngắn đồng phục], quần [xanh navy dài], khăn [đỏ cột cổ], giày [thể thao trắng]
+  • Tính cách: [tò mò, năng lượng cao, hay cười, nhiệt tình/trầm tính, suy nghĩ sâu, ít nói]
+  • Animation style: Pixar-inspired 3D semi-realistic
+  • ⚠️ GIỮ NGUYÊN thiết kế này TRONG MỌI CẢNH
+
+[Tên 2]: [Mô tả tương tự với cùng mức độ chi tiết...]
 
 🎨 Bối cảnh tổng thể:
-[Địa điểm chính], có [đạo cụ, cây cối, đồ vật], ánh sáng [tự nhiên/studio/...].
-Âm thanh: [tiếng gì].
-Phong cách: ${hideFormulas ? 'Live-action học đường, geometry-only (không công thức, không chữ)' : 'Live-action học đường'}.
+[Địa điểm chính: lớp học/sân trường/...], có [bàn ghế gỗ, bảng đen, cây xanh qua cửa sổ, ...].
+Ánh sáng: [tự nhiên qua cửa sổ bên trái, 5200K neutral daylight, bóng đổ hướng nhất quán].
+Âm thanh: [tiếng chim hót nhẹ, giấy xào xạc, bút viết, ambient loop: classroom_soft_ambience].
+Màu sắc: [tông ấm trung tính, palette lớp học Việt Nam].
+Phong cách: ${hideFormulas ? 'Pixar-inspired 3D semi-realistic, geometry-only (không công thức, không chữ)' : 'Pixar-inspired 3D semi-realistic'}.
 Tổng thời lượng: ${totalDuration} (${sceneStructure}).
-Tông màu: sáng ấm, ánh sáng thống nhất, continuity xuyên suốt.
+Timeline metadata: series_id "[TitleSlug]", continuity_mode "strict".
 ${hideFormulas ? 'Không có text, công thức, hoặc số liệu hiển thị trên màn hình — toàn bộ nội dung được thể hiện qua thoại và hành động.' : ''}
 
 **Format từng cảnh:**
@@ -345,7 +382,33 @@ ipcMain.handle('generate-story-from-url', async (event, { apiKey, url, sourceTyp
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // Build system instruction based on options
-        let systemInstruction = `You are an expert storyboard writer who transforms mathematical articles into detailed video scene scripts with camera angles, lighting, and character actions.`;
+        let systemInstruction = `You are an expert storyboard writer who transforms mathematical articles into detailed video scene scripts with camera angles, lighting, and character actions.
+
+CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Runway Gen-3, Pika 2.0):
+
+1. CHARACTER CONSISTENCY:
+   - Describe characters in PIXAR-LEVEL DETAIL (age, face shape, eyes color/size, nose, mouth, skin tone, hair style/color/texture, height, build, outfit details, personality traits)
+   - Use reference tags: [CharacterName]_consistent
+   - Example: "Nam, 12 tuổi, mặt tròn, mắt nâu to sáng, mũi nhỏ, nụ cười rạng rỡ, da sáng Việt Nam, tóc đen ngắn chải gọn, chiều cao trung bình 145cm, dáng người gầy khỏe mạnh, áo trắng tay ngắn, quần xanh navy, khăn đỏ, giày thể thao trắng, năng lượng cao, tò mò"
+   - ALL characters MUST maintain EXACT SAME appearance across ALL scenes
+
+2. ENVIRONMENT CONTROL:
+   - Lighting: temperature_kelvin 5200 (neutral daylight), consistent shadow direction
+   - Background: maintain same layout, props, furniture across scenes
+   - Color palette: warm neutral tones
+   - Props persistence: objects don't disappear/appear randomly
+
+3. AUDIO CONTINUITY:
+   - Ambient loop: consistent background sound throughout
+   - Crossfade: 0.8s between scenes
+   - Volume ratio: speech 0.85 / ambience 0.15
+   - Microphone: lapel simulation for natural voice
+
+4. TIMELINE METADATA:
+   - Link scenes with timeline_id
+   - Specify scene_number, previous_scene, next_scene
+   - Transition type: soft cut/match action/fade/dissolve
+   - Maintain elements: character positions, lighting angle, desk arrangement`;
 
         if (addBridgeScenes) {
             systemInstruction += ` You create storyboards with MAIN SCENES and BRIDGE SCENES for smooth transitions.`;
@@ -405,8 +468,23 @@ ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 
 **Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề]"
-👥 Nhân vật: [Mô tả chi tiết 2-3 nhân vật]
-🎨 Bối cảnh tổng thể: [Địa điểm, đạo cụ, ánh sáng, âm thanh, phong cách]
+
+👥 Nhân vật (MÔ TẢ CHI TIẾT PIXAR-LEVEL):
+[Tên]: [reference_tag: [Name]_consistent]
+  • Tuổi: [12 tuổi]
+  • Khuôn mặt: [tròn/vuông/oval], mắt [màu nâu/đen, to/nhỏ, biểu cảm gì], mũi [nhỏ/cao/tẹt], miệng [nụ cười rộng/nhỏ], da [sáng/ngăm đen], điểm đặc biệt [má lúm đồng tiền/vết chàm/...]
+  • Tóc: [đen/nâu], [ngắn gọn/dài vai], [thẳng/xoăn], [chi tiết: chải ngôi giữa/buộc đuôi gà/...]
+  • Thân hình: chiều cao [145cm/150cm/...], dáng [gầy/mập/khỏe], tư thế [tự tin/nhút nhát]
+  • Trang phục: áo [trắng tay ngắn đồng phục], quần [xanh navy dài], khăn [đỏ cột cổ], giày [thể thao trắng]
+  • Tính cách: [tò mò, năng lượng cao, hay cười, nhiệt tình/trầm tính, suy nghĩ sâu, ít nói]
+  • Animation style: Pixar-inspired 3D semi-realistic
+  • ⚠️ GIỮ NGUYÊN thiết kế này TRONG MỌI CẢNH
+
+🎨 Bối cảnh tổng thể:
+[Địa điểm chính], có [đạo cụ chi tiết], ánh sáng [5200K neutral daylight, bóng đổ nhất quán], âm thanh [ambient loop: classroom_soft_ambience], màu sắc [tông ấm trung tính].
+Phong cách: Pixar-inspired 3D semi-realistic.
+Timeline metadata: series_id "[TitleSlug]", continuity_mode "strict".
+
 ⏱️ Tổng thời lượng: ${totalDuration}
 
 **Format từng cảnh:**
