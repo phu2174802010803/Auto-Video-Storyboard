@@ -129,10 +129,10 @@ const StoryHistory = () => {
                                 </div>
                                 <div className="story-card-content">
                                     <p className="story-preview">
-                                        {story.content.substring(0, 120)}...
+                                        {(story.content || '').substring(0, 120)}...
                                     </p>
                                     <div className="story-meta">
-                                        <span>📝 {story.wordCount} từ</span>
+                                        <span>📝 {story.wordCount || 0} từ</span>
                                         <span>🕐 {formatDate(story.createdAt)}</span>
                                     </div>
                                 </div>
@@ -173,15 +173,15 @@ const StoryHistory = () => {
                             <div className="detail-info">
                                 <div className="info-row">
                                     <span className="info-label">Nguồn:</span>
-                                    <span className="info-value">{selectedStory.source}</span>
+                                    <span className="info-value">{selectedStory.source || 'Không rõ'}</span>
                                 </div>
                                 <div className="info-row">
                                     <span className="info-label">Phong cách hình ảnh:</span>
-                                    <span className="info-value">{selectedStory.style}</span>
+                                    <span className="info-value">{selectedStory.style || 'Không rõ'}</span>
                                 </div>
                                 <div className="info-row">
                                     <span className="info-label">Số từ:</span>
-                                    <span className="info-value">{selectedStory.wordCount}</span>
+                                    <span className="info-value">{selectedStory.wordCount || 0}</span>
                                 </div>
                                 <div className="info-row">
                                     <span className="info-label">Ngày tạo:</span>
@@ -192,7 +192,7 @@ const StoryHistory = () => {
                             <div className="detail-content">
                                 <h4>Nội dung</h4>
                                 <div className="content-box">
-                                    <pre>{selectedStory.content}</pre>
+                                    <pre>{selectedStory.content || 'Không có nội dung'}</pre>
                                 </div>
                             </div>
 
