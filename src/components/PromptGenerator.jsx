@@ -194,11 +194,11 @@ const PromptGenerator = () => {
         } finally {
             clearInterval(progressInterval); // Stop simulation when done
             setIsGeneratingPrompts(false);
-            
+
             // Ensure we reach 100% before clearing
             setProgress(100);
             setProgressStatus('Hoàn tất!');
-            
+
             // Keep progress at 100% for 2 seconds before clearing
             setTimeout(() => {
                 setProgress(0);

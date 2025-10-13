@@ -288,23 +288,23 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         const totalSeconds = durationMinutes * 60;
         const mainSceneDuration = 10; // seconds per main scene
         const bridgeSceneDuration = 3; // seconds per bridge scene
-        
+
         let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
-        
+
         if (addBridgeScenes) {
             // Calculate with bridge scenes: every 2 main scenes need 1 bridge
             numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
             numBridgeScenes = Math.max(0, numMainScenes - 1); // bridges between main scenes
             const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
             sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} cảnh chính + ${numBridgeScenes} cảnh bridge)`;
-            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         } else {
             // Calculate without bridge scenes
             numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
             numBridgeScenes = 0;
             const actualDuration = numMainScenes * mainSceneDuration;
             sceneStructure = `${numMainScenes} cảnh chính`;
-            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         }
 
         const prompt = `Hãy tạo storyboard video giáo dục toán học CHUẨN CHUYÊN NGHIỆP cho chủ đề sau:
@@ -423,9 +423,9 @@ Hãy tạo storyboard theo ĐÚNG format trên!`;
         event.sender.send('progress-update', { progress: 30, status: 'Đang gửi yêu cầu tới AI...' });
 
         const result = await model.generateContent(prompt);
-        
+
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý phản hồi từ AI...' });
-        
+
         const response = result.response;
         const text = response.text();
 
@@ -549,25 +549,25 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         const totalSeconds = durationMinutes * 60;
         const mainSceneDuration = 10; // seconds per main scene
         const bridgeSceneDuration = 3; // seconds per bridge scene
-        
+
         let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
-        
+
         if (addBridgeScenes) {
             // Calculate with bridge scenes
             numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
             numBridgeScenes = Math.max(0, numMainScenes - 1);
             const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
             sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} chính + ${numBridgeScenes} bridge)`;
-            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         } else {
             // Calculate without bridge scenes
             numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
             numBridgeScenes = 0;
             const actualDuration = numMainScenes * mainSceneDuration;
             sceneStructure = `${numMainScenes} cảnh chính`;
-            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration/60*10)/10} phút)`;
+            totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         }
-        
+
         const sourceLabel = sourceType === 'file' ? `file ${fileName}` : 'bài viết';
 
         // Build content section with optional urlIdea
@@ -635,9 +635,9 @@ Hãy tạo storyboard theo ĐÚNG format CHUẨN trên!`;
         event.sender.send('progress-update', { progress: 35, status: 'Đang phân tích nội dung...' });
 
         const result = await model.generateContent(prompt);
-        
+
         event.sender.send('progress-update', { progress: 75, status: 'Đang tạo storyboard từ nội dung...' });
-        
+
         const response = result.response;
         const text = response.text();
 
@@ -991,9 +991,9 @@ TTS Script (LONG, DETAILED, COMPREHENSIVE):
         event.sender.send('progress-update', { progress: 25, status: `Đang tạo ${numPrompts} prompt video...` });
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
-        
+
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý và format prompts...' });
-        
+
         const response = await result.response;
         const text = response.text().trim();
 
@@ -1065,9 +1065,9 @@ Both paragraphs must be on ONE LINE each (no \\n inside the strings).`;
         event.sender.send('progress-update', { progress: 30, status: 'Đang tạo Character Bible...' });
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
-        
+
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý Character Bible...' });
-        
+
         const response = await result.response;
         let text = response.text();
 
@@ -1164,9 +1164,9 @@ Return a JSON array of scenes:
         event.sender.send('progress-update', { progress: 30, status: `Đang tạo ${calculatedScenes} cảnh storyboard...` });
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
-        
+
         event.sender.send('progress-update', { progress: 70, status: 'Đang xử lý storyboard...' });
-        
+
         const response = await result.response;
         let text = response.text();
 
@@ -1307,9 +1307,9 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        
+
         // CRITICAL: Increase output tokens to prevent truncation
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash-exp',
             generationConfig: {
                 maxOutputTokens: 8192,  // Increased from default 2048
@@ -1519,9 +1519,9 @@ TTS Script:
         console.log('🎬 Generating structured prompts...');
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
-        
+
         event.sender.send('progress-update', { progress: 60, status: 'Đang tạo prompts cho từng cảnh...' });
-        
+
         const response = await result.response;
         const text = response.text();
 
