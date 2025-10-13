@@ -682,56 +682,143 @@ ipcMain.handle('generate-video-prompts', async (event, { config, apiKey }) => {
         });
 
         // Calculate number of prompts based on duration
-        const sceneDuration = config.promptType === 'detailed' ? 8 : config.promptType === 'medium' ? 5 : 3;
+        const sceneDuration = config.promptType === 'detailed' ? 10 : config.promptType === 'medium' ? 8 : 5;
         const totalSeconds = parseInt(config.duration) * 60;
         const numPrompts = Math.ceil(totalSeconds / sceneDuration);
 
-        // ✨ NEW: Build system prompt using STORYBOARD format for consistency
-        const systemPrompt = `You are an expert storyboard creator for AI video generation.
+        // Build system prompt with FULL structured format (SETTING CHUNG + PROMPT per scene)
+        const systemPrompt = `You are an expert video prompt creator for educational videos.
 
-**Task:** Create ${numPrompts} scenes for video generation.
+**Task:** Generate structured video prompts following this EXACT format.
 
-**Genre/Style:** ${config.style}
-**Story Type:** ${config.storyType}
-**Aspect Ratio:** ${config.aspectRatio || '16:9'}
-**Scene Duration:** ${sceneDuration} seconds each
-**Language:** ${config.language === 'vietnamese' ? 'Vietnamese' : config.language === 'english' ? 'English' : config.language}
+**INPUT DETAILS:**
+- Genre/Style: ${config.style}
+- Story Type: ${config.storyType}
+- Number of scenes: ${numPrompts}
+- Scene duration: ${sceneDuration} seconds each
+- Aspect Ratio: ${config.aspectRatio || '16:9'}
+- Language: ${config.language === 'vietnamese' ? 'Vietnamese' : config.language === 'english' ? 'English' : config.language}
+${config.characterBible ? `\n**CHARACTER BIBLE:**\n${config.characterBible}\n` : ''}
 
-${config.characterBible ? `**CHARACTER BIBLE (use character names ONLY in prompts):**\n${config.characterBible}\n` : ''}
+**OUTPUT FORMAT:**
 
-**Setup Options Applied:**
-${config.setupOptions.englishLanguage ? '- English prompts\n' : ''}${config.setupOptions.syncCharacters ? '- Consistent characters throughout\n' : ''}${config.setupOptions.nameCharacters ? '- Use character names\n' : ''}${config.setupOptions.useKeywords ? '- Describe emotions and expressions\n' : ''}${config.setupOptions.describeShapes ? '- Include camera angles\n' : ''}${config.setupOptions.describeColors ? '- Describe lighting and colors\n' : ''}${config.setupOptions.linkScenes ? '- Link scenes smoothly\n' : ''}${config.setupOptions.createStoryArc ? '- Create cohesive story arc\n' : ''}
+First, generate SETTING CHUNG (general settings) - generated ONCE:
+
+🧱 SETTING CHUNG – Thông số kỹ thuật & phong cách
+
+Style: ${config.style}. Giữ phong cách giáo dục, tông màu sáng ấm, chi tiết rõ nét.
+
+Location: [Generate appropriate location based on story type and style]
+
+Characters:
+  [List all main characters with brief descriptions]
+
+Character consistency control:
+  [For EACH main character, create DETAILED description in this format:]
+  
+  [Character name]:
+    reference_tag: "[CharacterName]_[role]_consistent"
+    age: "[exact age]"
+    facial_features:
+      face_shape: "[round/oval/square]"
+      eyes: "[color], [size], [expression]"
+      nose: "[small/medium/large], [shape]"
+      mouth: "[description], [smile type]"
+      skin_tone: "[description]"
+      distinctive_marks: "[unique features]"
+    hair:
+      style: "[detailed hairstyle]"
+      color: "[hair color]"
+      texture: "[straight/wavy/curly]"
+      details: "[bangs/neat/messy]"
+    body:
+      height: "[short/average/tall] for age"
+      build: "[slim/athletic/average]"
+      posture: "[confident/relaxed/curious]"
+    outfit:
+      top: "[shirt description]"
+      bottom: "[pants/skirt description]"
+      accessories: "[list accessories]"
+      shoes: "[shoe type and color]"
+    personality_expression:
+      default_emotion: "[cheerful/gentle/curious]"
+      energy_level: "[high/moderate/calm]"
+      signature_gesture: "[specific gesture]"
+    animation_style: "Pixar-inspired 3D semi-realistic, expressive"
+    render_instruction: "Keep EXACT design in EVERY scene"
+
+Environment control:
+  lighting_source: "soft natural lighting"
+  temperature_kelvin: 5200
+  shadow_direction: "consistent across scenes"
+  color_palette: "[appropriate for style]"
+  prop_persistence: true
+
+Audio continuity:
+  ambient_loop: "[appropriate ambient sound]"
+  crossfade_duration: 0.8s
+  maintain_volume_ratio: "speech 0.85 / ambience 0.15"
+
+Camera style: ${config.setupOptions.describeShapes ? 'Professional camera angles with variety' : 'Standard mid-shots'}
+
+Duration default: ${sceneDuration}s per scene
+Aspect: ${config.aspectRatio || '16:9'}
+FPS: 24
+
+Timeline metadata:
+  series_id: "[Generate unique ID]"
+  total_scenes: ${numPrompts}
+  continuity_mode: "strict"
+
+---
+
+Then, for EACH scene (${numPrompts} scenes total), generate:
+
+🎞️ PROMPT – Scene [number]
+
+Goal: [Scene purpose]
+
+Scene description: [Overall context with characters and setting]
+
+Characters in scene: [List characters with reference to consistency control]
+
+Beat plan:
+  0–${Math.floor(sceneDuration/3)}s: [Opening action]
+  ${Math.floor(sceneDuration/3)}–${Math.floor(sceneDuration*2/3)}s: [Main action]
+  ${Math.floor(sceneDuration*2/3)}–${sceneDuration}s: [Closing/transition]
+
+Camera: [Camera angle]
+
+Animation / Action: [Detailed movements]
+
+Emotion: [Atmosphere]
+
+Lighting: [Maintain consistency - soft natural, 5200K]
+
+Continuity:
+  timeline_id: "[same series_id]"
+  scene_number: [current number]
+  previous_scene: "Scene_[number-1]" or "None"
+  next_scene: "Scene_[number+1]" or "End"
+  transition_type: "[soft cut/fade/dissolve]"
+  maintain_from_previous: "[elements to keep]"
+
+TTS Script:
+  [Character]: "[Dialogue in ${config.language === 'vietnamese' ? 'Vietnamese' : 'English'}]"
+
+---
+
 **CRITICAL RULES:**
-1. Each scene is ${sceneDuration} seconds long
-2. Prompt structure:
-   - ${config.characterBible ? 'Character names ONLY (NOT full descriptions)' : 'Character descriptions'}
-   - Setting/location
-   - Actions and movements
-   - Lighting and atmosphere
-   - Camera angle (if setupOptions.describeShapes enabled)
-   - ${config.style} style
-   - ${config.aspectRatio || '16:9'} aspect ratio
-3. Camera: Professional camera angle (e.g., "Close-up", "Wide shot", "Medium shot", "Pan left to right")
-4. Action: Main action in scene (brief description)
-5. Dialogue: If characters speak, write in ${config.language === 'vietnamese' ? 'VIETNAMESE' : 'ENGLISH'} (embedded in video, NO subtitles)
-6. Text: ${config.promptType === 'detailed' ? 'Detailed descriptions' : config.promptType === 'medium' ? 'Medium length' : 'Concise descriptions'}
-7. NO text overlays, NO subtitles, NO speech bubbles
-8. Keep lighting, style, and aspect ratio consistent
-9. ${config.setupOptions.linkScenes ? 'Connect scenes smoothly (end of one scene flows to start of next)' : 'Each scene can be independent'}
-
-**Output format:**
-Return a JSON array of scenes:
-[
-  {
-    "scene_number": 1,
-    "text": "Full ${config.language === 'vietnamese' ? 'Vietnamese' : 'English'} prompt with all details...",
-    "prompt_en": "Full English prompt (same as text if English, or translation if Vietnamese)",
-    "prompt_vi": "Full Vietnamese prompt (same as text if Vietnamese, or translation if English)",
-    "camera": "Camera angle description",
-    "action": "Main action description",
-    "dialogue": "${config.language === 'vietnamese' ? 'Lời thoại (nếu có)' : 'Dialogue (if any)'}"
-  }
-]`;
+1. Output as formatted TEXT with emoji headers (🧱 🎞️), NOT JSON
+2. Generate SETTING CHUNG only ONCE at the beginning
+3. Generate exactly ${numPrompts} scenes (one 🎞️ PROMPT block per scene)
+4. Each scene exactly ${sceneDuration} seconds
+5. Character consistency control MUST have DETAILED descriptions
+6. Keep same characters, lighting, and environment throughout ALL scenes
+7. ${config.setupOptions.linkScenes ? 'Link scenes smoothly with continuity metadata' : 'Each scene can be independent'}
+8. NO text overlays, NO subtitles visible in video
+9. Dialogue in TTS Script: ${config.language === 'vietnamese' ? 'Vietnamese only' : 'English only'}
+10. Maintain strict visual consistency across all scenes`;
 
         // Build user prompt
         let userPrompt = '';
@@ -743,41 +830,13 @@ Return a JSON array of scenes:
 
         const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
         const response = await result.response;
-        let text = response.text();
+        const text = response.text().trim();
 
-        // Remove markdown code blocks if present
-        text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-        // Parse the JSON response
-        const scenes = JSON.parse(text);
-
-        // Validate that we got an array
-        if (!Array.isArray(scenes)) {
-            throw new Error('AI did not return a valid array');
-        }
-
-        // ✨ NEW: Validate and normalize to unified format
-        const validPrompts = scenes
-            .filter(s => s && (s.text || s.prompt_en || s.prompt_vi))
-            .map((s, index) => ({
-                scene_number: index + 1,
-                text: s.text || s.prompt_en || s.prompt_vi || '',
-                prompt_en: s.prompt_en || s.text || '',
-                prompt_vi: s.prompt_vi || s.text || '',
-                camera: s.camera || 'Medium shot',
-                action: s.action || 'Scene action',
-                dialogue: s.dialogue || ''
-            }));
-
-        if (validPrompts.length === 0) {
-            throw new Error('No valid prompts generated');
-        }
-
-        console.log(`✅ Generated ${validPrompts.length} unified prompts with full metadata`);
+        console.log(`✅ Generated structured prompts with SETTING CHUNG + ${numPrompts} scenes`);
 
         return {
             success: true,
-            prompts: validPrompts
+            data: text  // Return raw formatted text, not JSON array
         };
 
     } catch (error) {
