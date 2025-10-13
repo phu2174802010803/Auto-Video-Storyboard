@@ -558,7 +558,7 @@ MIT License
 
 ## 👨‍💻 Author
 
-Phú Nguyễn - [@phu2174802010803](https://github.com/phu2174802010803)
+Phú Chu - [@phu2174802010803](https://github.com/phu2174802010803)
 
 ---
 
