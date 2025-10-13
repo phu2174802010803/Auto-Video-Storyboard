@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import ModelSelector from './ModelSelector';
 import './PromptGenerator.css';
 
 const PromptGenerator = () => {
-    const { apiKey, stories } = useApp();
+    const { apiKey, stories, selectedModel, saveSelectedModel } = useApp();
     const { success, error: showError, warning } = useToast();
 
     const [activeTab, setActiveTab] = useState('video-prompts'); // video-prompts | history
@@ -161,7 +162,8 @@ const PromptGenerator = () => {
         try {
             const result = await window.electronAPI.generateStructuredPrompts({
                 storyboard: selectedStory,
-                apiKey: apiKey
+                apiKey: apiKey,
+                model: selectedModel
             });
 
             if (result.success) {
@@ -306,6 +308,12 @@ const PromptGenerator = () => {
             {activeTab === 'video-prompts' && (
                 <div className="tab-content">
                     <div className="control-section">
+                        {/* Model Selector */}
+                        <ModelSelector 
+                            selectedModel={selectedModel}
+                            onModelChange={saveSelectedModel}
+                        />
+
                         <div className="form-group">
                             <label>📚 Chọn Storyboard:</label>
                             <select

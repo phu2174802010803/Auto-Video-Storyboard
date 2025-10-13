@@ -1481,16 +1481,19 @@ Return a single JSON object:
 });
 
 // Generate structured video prompts from storyboard (Tab 1)
-ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey }) => {
+ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey, model: selectedModel }) => {
     try {
         event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
 
+        // Use selected model with fallback to default
+        const modelToUse = selectedModel || "gemini-2.5-flash-lite";
+
         // CRITICAL: Increase output tokens to prevent truncation
         const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',  // Changed to stable model with higher quota
+            model: modelToUse,
             generationConfig: {
                 maxOutputTokens: 8192,  // Increased from default 2048
                 temperature: 0.7,
