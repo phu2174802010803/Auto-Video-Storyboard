@@ -996,17 +996,49 @@ Style: Cinematic Pixar-like realism kết hợp học liệu 2D/3D. Giữ phong 
 Location: [Extract from storyboard - Vietnamese school context]
 
 Characters:
-  [List all main characters with descriptions from storyboard]
+  [List all main characters with brief intro from storyboard]
 
 Character consistency control:
-  [For each main character, create consistency rules]
+  [For EACH main character, create DETAILED consistency description in this format:]
+  
   [Character name]:
-    reference_tag: "[CharacterName]_[role]"
-    face_embedding: fixed
-    outfit: "[detailed outfit description]"
-    hairstyle: "[detailed hairstyle]"
-    tone: "[skin tone description]"
-    physical_traits: "[height, build, distinctive features]"
+    reference_tag: "[CharacterName]_[role]_consistent"
+    
+    age: "[exact age, e.g., 12 years old]"
+    
+    facial_features:
+      face_shape: "[round/oval/square], soft features"
+      eyes: "[color] eyes, [size - large/medium], [expression - bright/gentle]"
+      nose: "[small/medium], button nose"
+      mouth: "[description], [smile type - cheerful/gentle/bright]"
+      skin_tone: "[light/warm/natural] Vietnamese skin tone"
+      distinctive_marks: "[any unique features like dimples, freckles]"
+    
+    hair:
+      style: "[detailed hairstyle - short/long/shoulder-length]"
+      color: "black hair"
+      texture: "[straight/slightly wavy]"
+      details: "[bangs/side-swept/neat/messy]"
+    
+    body:
+      height: "[short/average/tall] for age"
+      build: "[slim/athletic/average]"
+      posture: "[confident/relaxed/curious]"
+    
+    outfit:
+      top: "white school uniform shirt"
+      bottom: "[navy blue pants/skirt]"
+      accessories: "red scarf, [school badge/backpack]"
+      shoes: "[sneakers/school shoes], [color]"
+    
+    personality_expression:
+      default_emotion: "[cheerful/gentle/curious/confident]"
+      energy_level: "[high/moderate/calm]"
+      signature_gesture: "[specific hand gesture or movement]"
+    
+    animation_style: "Pixar-inspired 3D semi-realistic, expressive facial animation, natural movements"
+    
+    render_instruction: "Keep this exact design perfectly consistent in EVERY scene. Same face, same hair, same outfit, same proportions."
 
 Environment control:
   lighting_source: "left-top soft daylight"
@@ -1052,7 +1084,9 @@ Then, for EACH scene, generate:
 
 Goal: [Scene purpose - what should be learned/shown]
 
-Scene description: [Overall context - characters present, setting, objects visible, layout]
+Scene description: [Overall context - characters present (use FULL character descriptions from Character consistency control), setting, objects visible, layout]
+
+Characters in scene: [List each character with reference to their consistency control - e.g., "Nam (reference: Nam_student_consistent - 12-year-old boy, short black hair, brown eyes, bright smile, white uniform, navy pants)"]
 
 Beat plan:
   0–3s: [Opening action - what happens in first 3 seconds]
@@ -1098,15 +1132,23 @@ TTS Script:
 4. Keep Vietnamese language natural and educational
 5. All dialogue in TTS Script must be in Vietnamese
 6. No English in output except section labels
-7. MAINTAIN STRICT CHARACTER CONSISTENCY: Each character MUST keep exact same face, hairstyle, outfit across ALL scenes using their reference_tag
-8. MAINTAIN ENVIRONMENT CONSISTENCY: Same lighting (left-top, 5200K), same classroom layout, same props across ALL scenes
-9. MAINTAIN AUDIO CONSISTENCY: Same ambient sounds, same volume ratios throughout
-10. Each scene exactly 10 seconds
-11. NO text, numbers, or formulas visible in video - only dialogue
-12. Focus on geometric accuracy for math/science content
-13. Use Continuity metadata in EVERY scene to link timeline
-14. When describing characters in scenes, reference their consistency control tags from SETTING CHUNG
-15. Transition types must be smooth and maintain visual continuity`;
+7. **CHARACTER CONSISTENCY (CRITICAL)**: 
+   - Create DETAILED physical descriptions for each character in Character consistency control
+   - Include: exact age, face shape, eye color/size, nose, mouth, skin tone, hair style/color/texture
+   - Describe body height/build, outfit details, accessories
+   - Add personality expression and signature gestures
+   - Must be detailed enough for AI to recreate EXACT same character in every scene
+   - Example level of detail: "12-year-old boy, round face, large brown eyes, button nose, bright cheerful smile, light Vietnamese skin tone, short black straight hair neatly combed, average height slim build, white uniform shirt, navy pants, red scarf, sneakers, cheerful energy, confident posture"
+8. MAINTAIN STRICT CHARACTER VISUAL CONSISTENCY: Each character MUST appear IDENTICAL in ALL scenes - same face, same hair, same outfit, same proportions
+9. MAINTAIN ENVIRONMENT CONSISTENCY: Same lighting (left-top, 5200K), same classroom layout, same props across ALL scenes
+10. MAINTAIN AUDIO CONSISTENCY: Same ambient sounds, same volume ratios throughout
+11. Each scene exactly 10 seconds
+12. NO text, numbers, or formulas visible in video - only dialogue
+13. Focus on geometric accuracy for math/science content
+14. Use Continuity metadata in EVERY scene to link timeline
+15. When describing characters in scenes, ALWAYS reference their full consistency control description from SETTING CHUNG
+16. Transition types must be smooth and maintain visual continuity
+17. **Pixar-inspired 3D style**: Semi-realistic, expressive facial animation, soft shadows, pastel color palette, natural movements`;
 
         const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
 
