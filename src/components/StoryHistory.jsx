@@ -11,13 +11,19 @@ const StoryHistory = () => {
     const [filterStyle, setFilterStyle] = useState('all');
 
     const filteredStories = stories.filter(story => {
-        const matchesSearch = story.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            story.source.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter = filterStyle === 'all' || story.style === filterStyle;
+        // Safe check: ensure fields exist before calling toLowerCase
+        const content = story.content || '';
+        const source = story.source || '';
+        const style = story.style || '';
+        
+        const matchesSearch = content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            source.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFilter = filterStyle === 'all' || style === filterStyle;
         return matchesSearch && matchesFilter;
     });
 
-    const uniqueStyles = [...new Set(stories.map(s => s.style))];
+    // Filter out undefined/null styles
+    const uniqueStyles = [...new Set(stories.map(s => s.style).filter(Boolean))];
 
     const handleDelete = (id) => {
         if (confirm('Bạn có chắc muốn xóa storyboard này?')) {
