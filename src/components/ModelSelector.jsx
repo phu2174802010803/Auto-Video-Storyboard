@@ -4,9 +4,9 @@ import './ModelSelector.css';
 
 const ModelSelector = ({ value, onChange, disabled = false }) => {
     const [showDetails, setShowDetails] = useState(false);
-    
+
     const selectedModel = GEMINI_MODELS.find(m => m.id === value) || GEMINI_MODELS.find(m => m.id === DEFAULT_MODEL);
-    
+
     // Group models by tier
     const groupedModels = {
         newest: GEMINI_MODELS.filter(m => m.tier === 'newest'),
@@ -16,7 +16,7 @@ const ModelSelector = ({ value, onChange, disabled = false }) => {
     };
 
     const getTierIcon = (tier) => {
-        switch(tier) {
+        switch (tier) {
             case 'newest': return '🆕';
             case 'stable': return '✅';
             case 'legacy': return '📦';
@@ -26,7 +26,7 @@ const ModelSelector = ({ value, onChange, disabled = false }) => {
     };
 
     const getTierLabel = (tier) => {
-        switch(tier) {
+        switch (tier) {
             case 'newest': return 'Mới nhất (2.5)';
             case 'stable': return 'Ổn định (2.0)';
             case 'legacy': return 'Thế hệ cũ (1.5)';
@@ -41,7 +41,7 @@ const ModelSelector = ({ value, onChange, disabled = false }) => {
                 <label>
                     <span className="label-icon">🤖</span>
                     <span className="label-text">Chọn AI Model</span>
-                    <button 
+                    <button
                         type="button"
                         className="info-button"
                         onClick={() => setShowDetails(!showDetails)}
@@ -200,25 +200,25 @@ const ModelSelector = ({ value, onChange, disabled = false }) => {
                     </div>
 
                     <div className="model-links">
-                        <a 
-                            href="https://aistudio.google.com/usage?timeRange=last-28-days&tab=rate-limit" 
-                            target="_blank" 
+                        <a
+                            href="https://aistudio.google.com/usage?timeRange=last-28-days&tab=rate-limit"
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="link-button"
                         >
                             📊 Xem Quota còn lại
                         </a>
-                        <a 
-                            href="https://ai.google.dev/gemini-api/docs/models" 
-                            target="_blank" 
+                        <a
+                            href="https://ai.google.dev/gemini-api/docs/models"
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="link-button"
                         >
                             📚 Tài liệu Model
                         </a>
-                        <a 
-                            href="https://ai.google.dev/pricing" 
-                            target="_blank" 
+                        <a
+                            href="https://ai.google.dev/pricing"
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="link-button"
                         >

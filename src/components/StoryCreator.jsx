@@ -407,7 +407,7 @@ const StoryCreator = () => {
             </div>
 
             {/* Model Selector */}
-            <ModelSelector 
+            <ModelSelector
                 value={selectedModel}
                 onChange={saveSelectedModel}
                 disabled={loading}

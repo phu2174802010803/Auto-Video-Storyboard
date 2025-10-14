@@ -37,6 +37,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     generateStructuredPrompts: (params) => ipcRenderer.invoke('generate-structured-prompts', params),
     generateCharacterImage: (params) => ipcRenderer.invoke('generate-character-image', params),
 
+    // Veo3 Video Automation
+    validateVeo3Cookie: (params) => ipcRenderer.invoke('validate-veo3-cookie', params),
+    startVeo3Automation: (params) => ipcRenderer.invoke('start-veo3-automation', params),
+    stopVeo3Automation: () => ipcRenderer.send('stop-veo3-automation'),
+    onVeo3Log: (callback) => {
+        const subscription = (event, data) => callback(data);
+        ipcRenderer.on('veo3:log', subscription);
+        return () => ipcRenderer.removeListener('veo3:log', subscription);
+    },
+
+    // Generic event listener (for validation-progress, etc.)
+    on: (channel, callback) => {
+        const subscription = (event, data) => callback(data);
+        ipcRenderer.on(channel, subscription);
+        return subscription;
+    },
+    removeListener: (channel, callback) => {
+        ipcRenderer.removeListener(channel, callback);
+    },
+
     // App info
     getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

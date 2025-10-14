@@ -252,10 +252,425 @@
     line-height: 1.4;
 }
 
+/* Veo3 Accounts */
+.empty-accounts {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+/* Veo3 Accounts */
+.empty-accounts {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-accounts .empty-icon {
+    font-size: 64px;
+    display: block;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.empty-accounts p {
+    margin: 8px 0;
+}
+
+.empty-accounts .hint {
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+.accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.account-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.account-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.account-info {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+}
+
+.account-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.account-details {
+    flex: 1;
+}
+
+.account-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.account-details h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.verified-badge {
+    font-size: 14px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.account-email {
+    font-size: 13px;
+    color: var(--primary);
+    margin: 0 0 4px 0;
+    font-weight: 500;
+}
+
+.account-date {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin: 0;
+}
+
+.account-cookie {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+}
+
+.account-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.account-actions .btn-delete {
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.account-actions .btn-delete:hover {
+    background: var(--error);
+    color: white;
+}
+
+.add-account-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-account-btn:hover {
+    background: var(--accent);
+    transform: translateY(-1px);
+}
+
+.add-account-form {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.form-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.form-header h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+}
+
+.form-header p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.add-account-form .form-group {
+    margin-bottom: 16px;
+}
+
+.add-account-form .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.add-account-form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.required {
+    color: var(--error);
+    font-weight: 700;
+}
+
+.add-account-form input,
+.add-account-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.add-account-form textarea {
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+}
+
+.add-account-form input:focus,
+.add-account-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.add-account-form input:disabled,
+.add-account-form textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.input-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.input-hint a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.input-hint a:hover {
+    text-decoration: underline;
+}
+
+.input-hint strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.input-hint code {
+    background: var(--bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    color: var(--accent);
+    font-size: 11px;
+}
+
+.input-hint kbd {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.validation-progress {
+    margin: 16px 0;
+    padding: 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.validation-progress p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.validation-progress .progress-message {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0 0 12px 0;
+    text-align: center;
+}
+
+.validation-progress .progress-hint {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin: 12px 0 0 0;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    animation: progress 2s ease-in-out infinite;
+}
+
+@keyframes progress {
+    0% {
+        width: 0%;
+    }
+
+    50% {
+        width: 70%;
+    }
+
+    100% {
+        width: 100%;
+    }
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.btn-validate {
+    flex: 2;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-validate:hover:not(:disabled) {
+    background: var(--accent);
+    transform: translateY(-1px);
+}
+
+.btn-validate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-cancel {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: var(--text-secondary);
+}
+
+.cancel-btn {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cancel-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: var(--text-secondary);
+}
+
+.save-btn:disabled,
+.cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
 
     .info-grid,
     .features-list {
         grid-template-columns: 1fr;
+    }
+
+    .account-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .account-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }

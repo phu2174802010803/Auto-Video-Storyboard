@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import StoryCreator from './components/StoryCreator';
 import PromptGenerator from './components/PromptGenerator';
+import VideoGenerator from './components/VideoGenerator';
 import StoryHistory from './components/StoryHistory';
 import Settings from './components/Settings';
 import './App.css';
@@ -29,6 +30,7 @@ function App() {
                             <div className="content-wrapper">
                                 {activeView === 'create' && <StoryCreator />}
                                 {activeView === 'prompt' && <PromptGenerator />}
+                                {activeView === 'veo3' && <VideoGenerator />}
                                 {activeView === 'history' && <StoryHistory />}
                                 {activeView === 'settings' && <Settings />}
                             </div>

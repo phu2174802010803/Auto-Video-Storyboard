@@ -12,6 +12,10 @@
     --bg-tertiary: #0f1624;
     --accent: #6366f1;
     --accent-hover: #4f46e5;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --shadow-primary: rgba(59, 130, 246, 0.3);
     --text-primary: #e5e7eb;
     --text-secondary: #9ca3af;
     --text-tertiary: #6b7280;

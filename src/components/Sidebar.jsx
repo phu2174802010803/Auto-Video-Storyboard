@@ -4,7 +4,8 @@ import './Sidebar.css';
 const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed }) => {
     const menuItems = [
         { id: 'create', icon: '🎬', label: 'Tạo Storyboard', badge: null },
-        { id: 'prompt', icon: '📝', label: 'Tạo Prompt Video', badge: 'NEW' },
+        { id: 'prompt', icon: '📝', label: 'Tạo Prompt Video', badge: null },
+        { id: 'veo3', icon: '🎥', label: 'Tạo Video Veo3', badge: null },
         { id: 'history', icon: '📚', label: 'Lịch sử', badge: null },
         { id: 'settings', icon: '⚙️', label: 'Cài đặt', badge: null }
     ];

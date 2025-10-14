@@ -309,7 +309,7 @@ const PromptGenerator = () => {
                 <div className="tab-content">
                     <div className="control-section">
                         {/* Model Selector */}
-                        <ModelSelector 
+                        <ModelSelector
                             selectedModel={selectedModel}
                             onModelChange={saveSelectedModel}
                         />

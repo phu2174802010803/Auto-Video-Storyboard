@@ -15,7 +15,7 @@ const StoryHistory = () => {
         const content = story.content || '';
         const source = story.source || '';
         const style = story.style || '';
-        
+
         const matchesSearch = content.toLowerCase().includes(searchTerm.toLowerCase()) ||
             source.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filterStyle === 'all' || style === filterStyle;

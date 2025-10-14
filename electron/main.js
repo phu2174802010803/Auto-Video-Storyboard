@@ -24,39 +24,39 @@ let stopFlowAutomation = false;
  */
 async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
     let lastError;
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await fn();
         } catch (error) {
             lastError = error;
-            
+
             // Check if it's a rate limit error (429)
-            const isRateLimitError = 
-                error.message?.includes('429') || 
+            const isRateLimitError =
+                error.message?.includes('429') ||
                 error.message?.includes('Too Many Requests') ||
                 error.message?.includes('quota') ||
                 error.message?.includes('rate limit');
-            
+
             if (!isRateLimitError) {
                 // Not a rate limit error, throw immediately
                 throw error;
             }
-            
+
             // If this was the last attempt, throw
             if (attempt === maxRetries) {
                 throw new Error(`Rate limit exceeded after ${maxRetries + 1} attempts. Please wait 1 minute and try again, or upgrade your Gemini API plan. Details: ${error.message}`);
             }
-            
+
             // Calculate delay with exponential backoff
             const delay = initialDelay * Math.pow(2, attempt);
-            console.log(`⏳ Rate limit hit. Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries + 1})`);
-            
+            console.log(`⏳ Rate limit hit. Retrying in ${delay / 1000}s... (Attempt ${attempt + 1}/${maxRetries + 1})`);
+
             // Wait before retrying
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
-    
+
     throw lastError;
 }
 
@@ -173,7 +173,7 @@ ipcMain.handle('generate-content-summary', async (event, { apiKey, content, sour
         // Use user-selected model or fallback to highest quota model
         const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
             model: modelToUse,
             generationConfig: {
                 maxOutputTokens: 16384,  // Increase for comprehensive 9-part analysis
@@ -901,16 +901,25 @@ ipcMain.handle('get-app-version', () => {
     return app.getVersion();
 });
 
-// Select download directory for Flow automation
+// Select download directory for Flow automation and Veo3
 ipcMain.handle('select-download-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openDirectory']
+        properties: ['openDirectory'],
+        title: 'Chọn thư mục lưu video'
     });
 
     if (!result.canceled && result.filePaths.length > 0) {
-        return result.filePaths[0];
+        return {
+            success: true,
+            path: result.filePaths[0],
+            canceled: false
+        };
     }
-    return null;
+    return {
+        success: false,
+        path: null,
+        canceled: true
+    };
 });
 
 // Import prompts from text file
@@ -939,26 +948,83 @@ ipcMain.handle('import-prompts-from-file', async () => {
 // FLOW AUTOMATION - Batch Video Generation
 // ============================================
 
-// Cookie parser
+// Cookie parser - Parse cookie string from browser to Puppeteer format
 function parseCookieForPuppeteer(cookieString) {
     const cookies = [];
+
+    // Split by '; ' to get individual cookies
     const pairs = cookieString.split('; ');
 
+    console.log(`[Cookie Parser] Starting to parse ${pairs.length} cookie pairs...`);
+
     for (const pair of pairs) {
-        const [name, ...valueParts] = pair.split('=');
-        const value = valueParts.join('=');
+        const equalIndex = pair.indexOf('=');
+        if (equalIndex === -1) {
+            console.warn(`[Cookie Parser] Skipping invalid pair (no =): ${pair.substring(0, 50)}`);
+            continue;
+        }
 
-        if (!name || !value) continue;
+        const name = pair.substring(0, equalIndex).trim();
+        const value = pair.substring(equalIndex + 1).trim();
 
-        cookies.push({
-            name: name.trim(),
-            value: value.trim(),
-            domain: '.labs.google',
+        if (!name || !value) {
+            console.warn(`[Cookie Parser] Skipping empty name/value: ${name}`);
+            continue;
+        }
+
+        // Create cookie object with base fields
+        const cookie = {
+            name: name,
+            value: value,
             path: '/',
-            httpOnly: name.includes('Secure') || name.includes('session'),
-            secure: name.includes('Secure')
-        });
+            secure: true
+        };
+
+        // Cookie source: https://labs.google/fx/vi/tools/flow
+        // Use '.labs.google' (with dot) as wildcard domain for all subdomains
+        if (name.startsWith('__Host-')) {
+            // __Host- cookies: NO domain (will be set via CDP differently)
+            cookie.secure = true;
+            cookie.httpOnly = true;
+            cookie.domain = null; // Will be handled by CDP
+            console.log(`[Cookie Parser] __Host- cookie: ${name}`);
+        } else if (name.startsWith('__Secure-')) {
+            // __Secure- cookies - use wildcard domain
+            cookie.secure = true;
+            cookie.httpOnly = true;
+            cookie.domain = '.labs.google'; // Wildcard domain (with dot prefix)
+            console.log(`[Cookie Parser] __Secure- cookie: ${name}`);
+        } else {
+            // Regular cookies - use wildcard domain
+            cookie.domain = '.labs.google'; // Wildcard domain (with dot prefix)
+            cookie.httpOnly = false;
+            console.log(`[Cookie Parser] Regular cookie: ${name}`);
+        }
+
+        // Clean cookie value (keep URL encoding, just remove control chars)
+        const originalLength = cookie.value.length;
+        cookie.value = cookie.value.replace(/[\x00-\x1F\x7F]/g, '');
+        if (originalLength !== cookie.value.length) {
+            console.warn(`[Cookie Parser] Cleaned ${originalLength - cookie.value.length} control chars from ${name}`);
+        }
+
+        // Don't skip long cookies - CDP can handle them
+        // Session token is CRITICAL for authentication
+        if (cookie.value.length > 4000) {
+            console.warn(`[Cookie Parser] ⚠ Warning: ${name} is very long (${cookie.value.length} chars) - will try to set via CDP`);
+        }
+
+        cookies.push(cookie);
     }
+
+    const hostCount = cookies.filter(c => c.name.startsWith('__Host-')).length;
+    const secureCount = cookies.filter(c => c.name.startsWith('__Secure-')).length;
+    const regularCount = cookies.length - hostCount - secureCount;
+
+    console.log(`[Cookie Parser] ✓ Parsed ${cookies.length} cookies total:`);
+    console.log(`  - ${hostCount} __Host- cookies`);
+    console.log(`  - ${secureCount} __Secure- cookies`);
+    console.log(`  - ${regularCount} regular cookies`);
 
     return cookies;
 }
@@ -1718,7 +1784,7 @@ TTS Script:
         const sceneMatches = text.match(/🎞️.*PROMPT.*Scene/gi);
         const sceneCount = sceneMatches ? sceneMatches.length : 0;
         console.log(`📝 Generated ${sceneCount} scene prompts`);
-        
+
         // Warning if scene count seems low (but don't block - let user decide)
         if (sceneCount < 5) {
             console.warn(`⚠️ Warning: Only ${sceneCount} scenes generated. Output may be truncated.`);
@@ -1809,6 +1875,601 @@ ipcMain.handle('generate-character-image', async (event, { prompt, apiKey, refer
         return {
             success: false,
             error: error.message || 'Unknown error occurred'
+        };
+    }
+});
+
+// ==========================================
+// VEO3 AUTOMATION - Generate Videos from Prompts
+// ==========================================
+
+// Validate Veo3 cookie - NEW SIMPLE APPROACH
+// Instead of parsing cookie string, we launch browser with persistent profile
+// User logs in ONCE manually, cookies persist forever
+// COOKIE STRING VALIDATION - Import cookies to temporary browser
+ipcMain.handle('validate-veo3-cookie', async (event, { cookieString }) => {
+    const puppeteer = require('puppeteer-core');
+    const path = require('path');
+
+    if (!cookieString || !cookieString.trim()) {
+        return {
+            success: false,
+            error: 'Cookie string trống!'
+        };
+    }
+
+    try {
+        console.log('[Validate] =====================================');
+        console.log('[Validate] KIỂM TRA COOKIE');
+        console.log('[Validate] =====================================');
+
+        // Parse cookies - support both formats
+        const cookies = [];
+        const trimmedString = cookieString.trim();
+
+        // Check format: semicolon = document.cookie, tab = DevTools TSV
+        if (trimmedString.includes(';') && !trimmedString.includes('\t')) {
+            // Format 1: document.cookie format (name=value; name2=value2)
+            console.log('[Validate] Detected document.cookie format');
+            const pairs = trimmedString.split(';');
+
+            for (const pair of pairs) {
+                const [name, ...valueParts] = pair.trim().split('=');
+                if (name && valueParts.length > 0) {
+                    const value = valueParts.join('='); // Rejoin in case value has '='
+                    const trimmedName = name.trim();
+
+                    // Determine domain based on cookie name
+                    let domain = '.google.com';
+                    if (trimmedName.includes('next-auth') || trimmedName === 'EMAIL' || trimmedName.startsWith('_ga')) {
+                        domain = 'labs.google'; // labs.google specific cookies
+                    }
+
+                    cookies.push({
+                        name: trimmedName,
+                        value: value.trim(),
+                        domain: domain,
+                        path: '/',
+                        secure: true,
+                        httpOnly: false,
+                        sameSite: 'Lax'
+                    });
+                }
+            }
+        } else {
+            // Format 2: DevTools TSV format
+            console.log('[Validate] Detected DevTools TSV format');
+            const lines = trimmedString.split('\n');
+
+            for (const line of lines) {
+                const parts = line.trim().split('\t');
+                if (parts.length >= 7) {
+                    const cookie = {
+                        name: parts[5],
+                        value: parts[6],
+                        domain: parts[0],
+                        path: parts[2],
+                        secure: parts[3] === 'TRUE' || parts[3] === '✓',
+                        httpOnly: parts[4] === 'TRUE' || parts[4] === '✓',
+                        sameSite: 'None'
+                    };
+
+                    // Set expiration if provided
+                    if (parts[1] && parts[1] !== '0') {
+                        cookie.expires = parseInt(parts[1]);
+                    }
+
+                    cookies.push(cookie);
+                }
+            }
+        }
+
+        console.log(`[Validate] Parsed ${cookies.length} cookies`);
+
+        if (cookies.length === 0) {
+            return {
+                success: false,
+                error: 'Không tìm thấy cookie hợp lệ! Vui lòng copy đúng format từ DevTools.'
+            };
+        }
+
+        // Launch browser to test cookies
+        const browser = await puppeteer.launch({
+            headless: false,
+            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--start-maximized' // Maximize window
+            ],
+            ignoreDefaultArgs: ['--enable-automation'],
+            defaultViewport: null // Use full screen size
+        });
+
+        const page = await browser.newPage();
+
+        // Maximize window
+        const pages = await browser.pages();
+        if (pages.length > 1) {
+            await pages[0].close(); // Close blank page
+        }
+
+        // Set cookies before navigation
+        console.log('[Validate] Đang set cookies...');
+        for (const cookie of cookies) {
+            try {
+                await page.setCookie(cookie);
+            } catch (err) {
+                console.log(`[Validate] Skip cookie ${cookie.name}: ${err.message}`);
+            }
+        }
+
+        // Navigate to Flow page
+        console.log('[Validate] Đang mở trang Flow...');
+        mainWindow.webContents.send('validation-progress', '🌐 Đang tải trang labs.google/flow...');
+
+        await page.goto('https://labs.google/fx/vi/tools/flow', {
+            waitUntil: 'networkidle2',
+            timeout: 60000
+        });
+
+        console.log('[Validate] Trang đã tải xong, đợi textarea xuất hiện...');
+        console.log('[Validate] (Tổng thời gian kiểm tra: ~15-20 giây)');
+        mainWindow.webContents.send('validation-progress', '✅ Trang đã tải xong! Đang kiểm tra trạng thái đăng nhập...');
+
+        // Wait a bit for page to fully load
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Close any popup/modal that might be blocking
+        console.log('[Validate] Đóng popup nếu có...');
+        mainWindow.webContents.send('validation-progress', '🔄 Đang đóng popup chào mừng (nếu có)...');
+
+        let popupClosed = false;
+        try {
+            // Method 1: Press ESC key multiple times
+            for (let i = 0; i < 3; i++) {
+                await page.keyboard.press('Escape');
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            console.log('[Validate] Đã nhấn ESC 3 lần');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Method 2: Click X button (top-right of popup)
+            // Popup is around 600px from left, X is at top-right
+            await page.mouse.click(598, 209); // Click on X position from screenshot
+            console.log('[Validate] Đã click vào vị trí nút X');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            popupClosed = true;
+
+        } catch (e) {
+            console.log('[Validate] Lỗi khi đóng popup:', e.message);
+        }
+
+        if (popupClosed) {
+            console.log('[Validate] Popup đã đóng, đợi thêm 2s...');
+            mainWindow.webContents.send('validation-progress', '✅ Popup đã đóng! Đang tìm giao diện tạo video...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        // IMPROVED: Check multiple signs of successful login
+        mainWindow.webContents.send('validation-progress', '🔍 Đang kiểm tra dấu hiệu đăng nhập thành công...');
+
+        let isLoggedIn = false;
+        let loginMethod = '';
+        let retryCount = 0;
+        const maxRetries = 15; // Increase to 15s for slow connections
+
+        while (!isLoggedIn && retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Check every 1s
+
+            // Method 1: Check for textarea (primary UI element)
+            const textarea1 = await page.$('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID').catch(() => null);
+            const textarea2 = await page.$('textarea[placeholder*="Describe"]').catch(() => null);
+            const textarea3 = await page.$('textarea[placeholder*="mô tả"]').catch(() => null);
+            const anyTextarea = await page.$('textarea').catch(() => null);
+
+            if (textarea1 || textarea2 || textarea3) {
+                isLoggedIn = true;
+                loginMethod = 'textarea found (primary)';
+                break;
+            }
+
+            // Method 2: Check for user profile element (avatar/email in header)
+            const userAvatar = await page.$('[aria-label*="Google Account"]').catch(() => null);
+            const userMenu = await page.$('[aria-label*="profile"]').catch(() => null);
+
+            if (userAvatar || userMenu) {
+                // If we see user profile, login is successful even without textarea
+                // Textarea might be loading or behind a modal
+                console.log('[Validate] Found user profile element - login confirmed');
+                isLoggedIn = true;
+                loginMethod = 'user profile detected';
+
+                // Try to find textarea one more time after confirming login
+                if (anyTextarea) {
+                    loginMethod = 'user profile + textarea';
+                }
+                break;
+            }
+
+            // Method 3: Check URL - if NOT redirected to login page, we're good
+            const currentUrl = page.url();
+            if (currentUrl.includes('/tools/flow') && !currentUrl.includes('signin') && !currentUrl.includes('login')) {
+                // Still on Flow page (not redirected to login) - good sign
+                console.log('[Validate] Still on Flow page, checking for any interactive elements...');
+
+                // Look for ANY sign of loaded UI (buttons, inputs, etc.)
+                const hasButton = await page.$('button').catch(() => null);
+                const hasInput = await page.$('input').catch(() => null);
+
+                if (hasButton || hasInput || anyTextarea) {
+                    isLoggedIn = true;
+                    loginMethod = 'Flow page loaded with UI elements';
+                    break;
+                }
+            }
+
+            // Method 4: Check page content for absence of "Sign in" text
+            const pageText = await page.evaluate(() => document.body.innerText).catch(() => '');
+            const hasSignInText = pageText.toLowerCase().includes('sign in') ||
+                pageText.toLowerCase().includes('đăng nhập');
+
+            if (!hasSignInText && pageText.length > 100) {
+                // No "Sign in" prompt and page has content - likely logged in
+                console.log('[Validate] No sign-in prompt detected, page has content');
+                isLoggedIn = true;
+                loginMethod = 'no sign-in prompt on page';
+                break;
+            }
+
+            retryCount++;
+            const remainingTime = maxRetries - retryCount;
+            console.log(`[Validate] Lần thử ${retryCount}/${maxRetries}... (còn ${remainingTime}s)`);
+            mainWindow.webContents.send('validation-progress',
+                `🔍 Đang kiểm tra đăng nhập... (${retryCount}/${maxRetries}s)`
+            );
+        }
+
+        if (isLoggedIn) {
+            console.log(`[Validate] ✓ Cookie hợp lệ! Đã đăng nhập thành công (${loginMethod})`);
+            mainWindow.webContents.send('validation-progress', '✅ Đăng nhập thành công! Đang lấy thông tin tài khoản...');
+
+            // Try to interact with textarea to confirm it's really usable
+            try {
+                const textarea = await page.$('textarea').catch(() => null);
+                if (textarea) {
+                    console.log('[Validate] Testing textarea interaction...');
+                    await textarea.click();
+                    await page.keyboard.type('test', { delay: 50 });
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Clear the test text
+                    await page.keyboard.down('Control');
+                    await page.keyboard.press('A');
+                    await page.keyboard.up('Control');
+                    await page.keyboard.press('Backspace');
+
+                    console.log('[Validate] ✓ Textarea is interactive and ready');
+                }
+            } catch (e) {
+                console.log('[Validate] Textarea interaction test skipped:', e.message);
+                // Not critical - login is confirmed by other methods
+            }
+
+            // Extract email from cookies
+            const pageCookies = await page.cookies();
+            const emailCookie = pageCookies.find(c => c.name === 'EMAIL');
+            let email = 'Unknown User';
+            if (emailCookie) {
+                try {
+                    email = decodeURIComponent(emailCookie.value).replace(/"/g, '');
+                    console.log('[Validate] Extracted email:', email);
+                } catch (e) {
+                    console.log('[Validate] Email extraction failed:', e.message);
+                }
+            }
+
+            // Also try to get email from page content
+            if (email === 'Unknown User') {
+                try {
+                    const userEmail = await page.evaluate(() => {
+                        // Try to find email in various common locations
+                        const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+                        const bodyText = document.body.innerText;
+                        const match = bodyText.match(emailPattern);
+                        return match ? match[0] : null;
+                    });
+                    if (userEmail) {
+                        email = userEmail;
+                        console.log('[Validate] Extracted email from page:', email);
+                    }
+                } catch (e) {
+                    console.log('[Validate] Page email extraction failed:', e.message);
+                }
+            }
+
+            await browser.close();
+
+            return {
+                success: true,
+                email: email,
+                cookieString: cookieString.trim(),
+                message: `✓ Cookie hợp lệ! Tài khoản: ${email}`
+            };
+        } else {
+            console.log('[Validate] ✗ Không phát hiện dấu hiệu đăng nhập sau 15s');
+            console.log('[Validate] Đang phân tích chi tiết trạng thái trang...');
+            mainWindow.webContents.send('validation-progress', '⚠️ Đang phân tích lỗi...');
+
+            // Detailed page analysis
+            const title = await page.title();
+            const url = page.url();
+            const pageText = await page.evaluate(() => document.body.innerText).catch(() => '');
+
+            console.log('[Validate] ===== PAGE DEBUG INFO =====');
+            console.log('[Validate] Page title:', title);
+            console.log('[Validate] Page URL:', url);
+            console.log('[Validate] Page text length:', pageText.length);
+            console.log('[Validate] First 500 chars:', pageText.substring(0, 500));
+
+            // Check for specific login indicators
+            const hasSignInButton = await page.$('button:has-text("Sign in")').catch(() => null) ||
+                await page.$('a:has-text("Sign in")').catch(() => null);
+            const hasSignInText = pageText.toLowerCase().includes('sign in') ||
+                pageText.toLowerCase().includes('đăng nhập');
+            const hasErrorMessage = pageText.toLowerCase().includes('error') ||
+                pageText.toLowerCase().includes('lỗi');
+
+            console.log('[Validate] Has Sign In button:', !!hasSignInButton);
+            console.log('[Validate] Has Sign In text:', hasSignInText);
+            console.log('[Validate] Has error message:', hasErrorMessage);
+
+            // Count elements on page
+            const elementCounts = await page.evaluate(() => ({
+                textareas: document.querySelectorAll('textarea').length,
+                buttons: document.querySelectorAll('button').length,
+                inputs: document.querySelectorAll('input').length,
+                divs: document.querySelectorAll('div').length,
+                totalElements: document.querySelectorAll('*').length
+            }));
+
+            console.log('[Validate] Element counts:', elementCounts);
+
+            // Get all textarea details if any exist
+            if (elementCounts.textareas > 0) {
+                const textareaDetails = await page.evaluate(() => {
+                    const areas = Array.from(document.querySelectorAll('textarea'));
+                    return areas.map(t => ({
+                        id: t.id,
+                        placeholder: t.placeholder,
+                        name: t.name,
+                        visible: !!(t.offsetWidth || t.offsetHeight || t.getClientRects().length),
+                        disabled: t.disabled
+                    }));
+                });
+                console.log('[Validate] Textarea details:', JSON.stringify(textareaDetails, null, 2));
+            }
+
+            // Take screenshot for debugging
+            const screenshotPath = path.join(app.getPath('userData'), 'validation-failed.png');
+            try {
+                await page.screenshot({ path: screenshotPath, fullPage: true });
+                console.log('[Validate] Screenshot saved to:', screenshotPath);
+            } catch (e) {
+                console.log('[Validate] Screenshot failed:', e.message);
+            }
+
+            await browser.close();
+
+            // Determine specific error message
+            let errorMessage = 'Không thể xác nhận đăng nhập thành công.\n\n';
+
+            if (hasSignInButton || hasSignInText) {
+                errorMessage += '❌ Phát hiện: Cookie đã hết hạn hoặc không hợp lệ\n';
+                errorMessage += '→ Vui lòng lấy cookie mới từ DevTools';
+            } else if (elementCounts.textareas > 0) {
+                errorMessage += '⚠️ Tìm thấy textarea nhưng không khớp selector\n';
+                errorMessage += '→ Google có thể đã thay đổi giao diện\n';
+                errorMessage += `→ Textarea details: ${JSON.stringify(elementCounts)}`;
+            } else if (elementCounts.totalElements < 50) {
+                errorMessage += '⚠️ Trang tải không đầy đủ (quá ít elements)\n';
+                errorMessage += '→ Kết nối mạng có thể bị chậm\n';
+                errorMessage += '→ Thử lại sau vài phút';
+            } else if (hasErrorMessage) {
+                errorMessage += '⚠️ Phát hiện thông báo lỗi trên trang\n';
+                errorMessage += '→ Google Labs có thể đang bảo trì\n';
+                errorMessage += '→ Thử lại sau';
+            } else {
+                errorMessage += '⚠️ Không xác định được lỗi cụ thể\n';
+                errorMessage += '→ Xem screenshot để debug: ' + screenshotPath;
+            }
+
+            return {
+                success: false,
+                error: errorMessage
+            };
+        }
+
+    } catch (error) {
+        console.error('[Validate] Error:', error);
+        return {
+            success: false,
+            error: `Lỗi: ${error.message}`
+        };
+    }
+});
+
+// Stop Veo3 automation handler
+ipcMain.on('stop-veo3-automation', () => {
+    console.log('Received stop Veo3 automation signal');
+    stopFlowAutomation = true;
+});
+
+// Start Veo3 automation
+ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, autoSaveConfig }) => {
+    const mainWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!mainWindow) return;
+
+    stopFlowAutomation = false;
+    let processedCount = 0;
+
+    // Log helper function
+    const logMessage = (promptId, message, status, videoUrl = null) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('veo3:log', {
+                promptId,
+                message,
+                status, // 'running' | 'processing' | 'success' | 'error'
+                videoUrl
+            });
+        }
+        console.log(`[Veo3 ${promptId || 'general'}] ${message}`);
+    };
+
+    try {
+        logMessage(null, 'Đang khởi động Veo3 automation...', 'running');
+
+        // Parse cookies
+        const cookies = parseCookieForPuppeteer(cookieString);
+        logMessage(null, `Đã parse ${cookies.length} cookies`, 'running');
+
+        // Import Puppeteer
+        const puppeteer = require('puppeteer-core');
+
+        // Launch browser
+        logMessage(null, 'Đang khởi động Chromium...', 'running');
+        const browser = await puppeteer.launch({
+            headless: false,
+            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process'
+            ]
+        });
+
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1920, height: 1080 });
+
+        // Set cookies
+        logMessage(null, 'Đang set cookies...', 'running');
+        await page.setCookie(...cookies);
+
+        // Navigate to Veo3
+        logMessage(null, 'Đang truy cập Google Veo 3...', 'running');
+        await page.goto('https://labs.google/fx/vi/tools/veo', {
+            waitUntil: 'networkidle2',
+            timeout: 60000
+        });
+
+        logMessage(null, 'Đã tải trang Veo 3 thành công', 'running');
+
+        // Wait for textarea
+        await page.waitForSelector('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', {
+            visible: true,
+            timeout: 30000
+        });
+
+        logMessage(null, `Bắt đầu xử lý ${prompts.length} prompts`, 'running');
+
+        // Process each prompt
+        for (let i = 0; i < prompts.length && !stopFlowAutomation; i++) {
+            const prompt = prompts[i];
+            logMessage(prompt.id, `[${i + 1}/${prompts.length}] Đang xử lý prompt`, 'processing');
+
+            try {
+                // Clear textarea
+                await page.waitForSelector('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', { visible: true, timeout: 10000 });
+                await page.click('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', { clickCount: 3 });
+                await page.keyboard.press('Backspace');
+
+                // Type prompt
+                logMessage(prompt.id, 'Đang nhập prompt...', 'processing');
+                await page.type('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', prompt.text, { delay: 30 });
+
+                // Submit
+                logMessage(prompt.id, 'Đang submit prompt...', 'processing');
+                await page.keyboard.press('Enter');
+
+                // Wait for video generation (max 5 minutes)
+                logMessage(prompt.id, 'Đang chờ video được tạo (tối đa 5 phút)...', 'processing');
+
+                try {
+                    await page.waitForFunction(() => {
+                        const video = document.querySelector('video[controlslist="nodownload"]');
+                        return video && video.src && !video.src.startsWith('data:') && video.src.includes('storage.googleapis.com');
+                    }, { timeout: 300000 }); // 5 minutes
+                } catch (timeoutError) {
+                    throw new Error('Timeout: Video không được tạo sau 5 phút');
+                }
+
+                // Extract video URL
+                const videoUrl = await page.evaluate(() => {
+                    const link = document.querySelector('a[href*="storage.googleapis.com"]');
+                    if (link && link.href) return link.href;
+
+                    const video = document.querySelector('video[controlslist="nodownload"]');
+                    if (video && video.src && !video.src.startsWith('data:')) return video.src;
+
+                    return null;
+                });
+
+                if (!videoUrl || videoUrl.startsWith('data:')) {
+                    throw new Error('Không tìm thấy URL video hợp lệ');
+                }
+
+                logMessage(prompt.id, 'Đã tạo video thành công!', 'success', videoUrl);
+                processedCount++;
+
+                // Auto download if enabled
+                if (autoSaveConfig.enabled && autoSaveConfig.path && typeof prompt.originalIndex === 'number') {
+                    logMessage(prompt.id, 'Đang tải video...', 'processing');
+                    const downloadResult = await downloadVideoFromUrl(videoUrl, prompt.text, autoSaveConfig.path, prompt.originalIndex);
+
+                    if (!downloadResult.success) {
+                        logMessage(prompt.id, `Lỗi khi lưu: ${downloadResult.error}`, 'error', videoUrl);
+                    } else {
+                        logMessage(prompt.id, `Đã lưu tại: ${downloadResult.path}`, 'success', videoUrl);
+                    }
+                }
+
+                // Delay between prompts
+                if (i < prompts.length - 1 && !stopFlowAutomation) {
+                    logMessage(null, 'Chờ 5 giây trước khi xử lý prompt tiếp theo...', 'running');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
+            } catch (error) {
+                logMessage(prompt.id, `Lỗi: ${error.message}`, 'error');
+                console.error(`Veo3 automation error for prompt ${prompt.id}:`, error);
+            }
+        }
+
+        await browser.close();
+        logMessage(null, `===== Hoàn thành! Đã xử lý ${processedCount}/${prompts.length} video =====`, 'success');
+
+        return {
+            success: true,
+            processed: processedCount,
+            total: prompts.length
+        };
+
+    } catch (error) {
+        logMessage(null, `Lỗi nghiêm trọng: ${error.message}`, 'error');
+        console.error('Veo3 automation fatal error:', error);
+
+        dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Lỗi Veo3 Automation',
+            message: error.message,
+            detail: error.stack
+        });
+
+        return {
+            success: false,
+            error: error.message
         };
     }
 });

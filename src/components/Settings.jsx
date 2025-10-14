@@ -5,9 +5,17 @@ import './Settings.css';
 
 const Settings = () => {
     const { apiKey, saveApiKey } = useApp();
-    const { success, warning } = useToast();
+    const { success, warning, error } = useToast();
     const [tempApiKey, setTempApiKey] = useState(apiKey);
     const [showApiKey, setShowApiKey] = useState(false);
+
+    // Veo3 Accounts Management
+    const [veo3Accounts, setVeo3Accounts] = useState(() => {
+        const saved = localStorage.getItem('veo3-accounts');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [showAddAccount, setShowAddAccount] = useState(false);
+    const [newAccountCookie, setNewAccountCookie] = useState('');
 
     const handleSave = () => {
         if (!tempApiKey.trim()) {
@@ -22,6 +30,74 @@ const Settings = () => {
         if (confirm('Bạn có chắc muốn xóa tất cả dữ liệu?')) {
             localStorage.clear();
             window.location.reload();
+        }
+    };
+
+    // Veo3 Account Management Functions
+    const [isValidating, setIsValidating] = useState(false);
+    const [validationProgress, setValidationProgress] = useState('');
+
+    const handleAddAccount = async () => {
+        if (!newAccountCookie.trim()) {
+            warning('Vui lòng paste cookie vào!');
+            return;
+        }
+
+        setIsValidating(true);
+        setValidationProgress('🚀 Đang khởi động kiểm tra...');
+
+        // Listen to validation progress updates
+        const progressListener = (message) => {
+            console.log('[UI] Validation progress:', message);
+            setValidationProgress(message);
+        };
+
+        const listenerRef = window.electronAPI.on('validation-progress', progressListener);
+
+        try {
+            const result = await window.electronAPI.validateVeo3Cookie({
+                cookieString: newAccountCookie.trim()
+            });
+
+            if (result.success) {
+                const newAccount = {
+                    id: Date.now(),
+                    name: result.email || `Tài khoản ${Date.now()}`,
+                    email: result.email,
+                    cookie: result.cookieString, // Store cookie string
+                    createdAt: new Date().toISOString(),
+                    validated: true
+                };
+
+                const updatedAccounts = [...veo3Accounts, newAccount];
+                setVeo3Accounts(updatedAccounts);
+                localStorage.setItem('veo3-accounts', JSON.stringify(updatedAccounts));
+
+                setNewAccountCookie('');
+                setShowAddAccount(false);
+                setValidationProgress('');
+                success(result.message);
+            } else {
+                setValidationProgress('');
+                error(result.error);
+            }
+        } catch (err) {
+            console.error('Validation error:', err);
+            setValidationProgress('');
+            error('Lỗi khi kiểm tra cookie: ' + err.message);
+        } finally {
+            // Clean up listener
+            window.electronAPI.removeListener('validation-progress', listenerRef);
+            setIsValidating(false);
+        }
+    };
+
+    const handleDeleteAccount = (id) => {
+        if (confirm('Bạn có chắc muốn xóa tài khoản này?')) {
+            const updatedAccounts = veo3Accounts.filter(acc => acc.id !== id);
+            setVeo3Accounts(updatedAccounts);
+            localStorage.setItem('veo3-accounts', JSON.stringify(updatedAccounts));
+            success('Đã xóa tài khoản!');
         }
     };
 
@@ -71,6 +147,123 @@ const Settings = () => {
                     <button className="save-btn" onClick={handleSave}>
                         💾 Lưu cài đặt
                     </button>
+                </div>
+
+                {/* Veo3 Accounts Management */}
+                <div className="settings-section">
+                    <div className="section-header">
+                        <h3>🔐 Tài Khoản Veo 3</h3>
+                        <p>Quản lý tài khoản Google để tạo video với Veo 3</p>
+                    </div>
+
+                    {veo3Accounts.length === 0 ? (
+                        <div className="empty-accounts">
+                            <span className="empty-icon">👤</span>
+                            <p>Chưa có tài khoản nào</p>
+                            <p className="hint">Thêm tài khoản Google để sử dụng Veo 3</p>
+                        </div>
+                    ) : (
+                        <div className="accounts-list">
+                            {veo3Accounts.map(account => (
+                                <div key={account.id} className="account-card">
+                                    <div className="account-info">
+                                        <div className="account-avatar">
+                                            <span>{account.email ? account.email.charAt(0).toUpperCase() : '👤'}</span>
+                                        </div>
+                                        <div className="account-details">
+                                            <div className="account-header-row">
+                                                <h4>{account.name}</h4>
+                                                {account.validated && (
+                                                    <span className="verified-badge" title="Đã xác thực">✅</span>
+                                                )}
+                                            </div>
+                                            {account.email && (
+                                                <p className="account-email">
+                                                    📧 {account.email}
+                                                </p>
+                                            )}
+                                            <p className="account-date">
+                                                📅 {new Date(account.createdAt).toLocaleString('vi-VN')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="account-actions">
+                                        <button
+                                            className="btn-delete"
+                                            onClick={() => handleDeleteAccount(account.id)}
+                                            title="Xóa tài khoản"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {showAddAccount && (
+                        <div className="add-account-form">
+                            <div className="input-group">
+                                <label>Cookie String <span className="required">*</span></label>
+                                <textarea
+                                    value={newAccountCookie}
+                                    onChange={(e) => setNewAccountCookie(e.target.value)}
+                                    placeholder="Paste toàn bộ cookies từ DevTools (Application → Cookies → labs.google)"
+                                    rows={6}
+                                />
+                                <div className="input-hint">
+                                    <strong>💡 Cách lấy cookie:</strong><br />
+                                    1. Mở <code>https://labs.google/fx/vi/tools/flow</code> và đăng nhập<br />
+                                    2. Nhấn <kbd>F12</kbd> → Tab <strong>Application</strong> → <strong>Cookies</strong> → <code>labs.google</code><br />
+                                    3. Click vào dòng đầu tiên, nhấn <kbd>Ctrl+A</kbd> để chọn tất cả<br />
+                                    4. Nhấn <kbd>Ctrl+C</kbd> để copy và paste vào đây
+                                </div>
+                            </div>
+
+                            {isValidating && (
+                                <div className="validation-progress">
+                                    <p className="progress-message">
+                                        {validationProgress || '� Đang khởi động...'}
+                                    </p>
+                                    <div className="progress-bar">
+                                        <div className="progress-bar-fill"></div>
+                                    </div>
+                                    <p className="progress-hint">
+                                        💡 Browser sẽ mở tự động và kiểm tra đăng nhập (~15-20 giây)
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="form-actions">
+                                <button
+                                    className="btn-validate"
+                                    onClick={handleAddAccount}
+                                    disabled={isValidating || !newAccountCookie.trim()}
+                                >
+                                    {isValidating ? '⏳ Đang kiểm tra...' : '✅ Xác thực & Lưu'}
+                                </button>
+                                <button
+                                    className="btn-cancel"
+                                    onClick={() => {
+                                        setShowAddAccount(false);
+                                        setNewAccountCookie('');
+                                    }}
+                                    disabled={isValidating}
+                                >
+                                    ❌ Hủy
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!showAddAccount && (
+                        <button
+                            className="add-account-btn"
+                            onClick={() => setShowAddAccount(true)}
+                        >
+                            ➕ Thêm Tài Khoản
+                        </button>
+                    )}
                 </div>
 
                 {/* App Info */}
