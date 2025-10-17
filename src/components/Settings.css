@@ -372,6 +372,22 @@
     gap: 8px;
 }
 
+.account-actions .btn-test {
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.account-actions .btn-test:hover {
+    background: var(--primary);
+    color: white;
+}
+
 .account-actions .btn-delete {
     padding: 8px 12px;
     background: transparent;

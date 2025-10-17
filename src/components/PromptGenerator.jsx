@@ -17,6 +17,10 @@ const PromptGenerator = () => {
     const [progress, setProgress] = useState(0);
     const [progressStatus, setProgressStatus] = useState('');
 
+    // Dialogue duration controls
+    const [enableDialogueSeconds, setEnableDialogueSeconds] = useState(false);
+    const [dialogueSeconds, setDialogueSeconds] = useState(8);
+
     // Tab 2: History
     const [promptHistory, setPromptHistory] = useState([]);
     const [historyFilter, setHistoryFilter] = useState('all'); // all | today | week | month
@@ -95,8 +99,13 @@ const PromptGenerator = () => {
                 currentSection = 'setting';
                 currentContent = [line];
             }
-            // Detect Scene sections
-            else if (line.match(/🎞️.*PROMPT.*Scene/i) || line.match(/PROMPT.*Scene/i)) {
+            // Detect Scene sections - support both old and new format
+            else if (
+                line.match(/🎞️.*PROMPT.*Scene/i) ||
+                line.match(/PROMPT.*Scene/i) ||
+                line.match(/🎞️\s*Scene\s*\d+/i) ||
+                line.match(/^Scene\s*\d+/i)
+            ) {
                 // Save previous section
                 if (currentSection === 'setting' && currentContent.length > 0) {
                     settingChung = currentContent.join('\n');
@@ -163,7 +172,9 @@ const PromptGenerator = () => {
             const result = await window.electronAPI.generateStructuredPrompts({
                 storyboard: selectedStory,
                 apiKey: apiKey,
-                model: selectedModel
+                model: selectedModel,
+                enableDialogueSeconds,
+                dialogueSeconds: enableDialogueSeconds ? Number(dialogueSeconds) : undefined
             });
 
             if (result.success) {
@@ -310,8 +321,8 @@ const PromptGenerator = () => {
                     <div className="control-section">
                         {/* Model Selector */}
                         <ModelSelector
-                            selectedModel={selectedModel}
-                            onModelChange={saveSelectedModel}
+                            value={selectedModel}
+                            onChange={saveSelectedModel}
                         />
 
                         <div className="form-group">
@@ -369,6 +380,33 @@ const PromptGenerator = () => {
                                     </div>
                                 ) : null;
                             })()}
+                        </div>
+
+                        {/* Dialogue Duration Controls */}
+                        <div className="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={enableDialogueSeconds}
+                                    onChange={(e) => setEnableDialogueSeconds(e.target.checked)}
+                                    style={{ marginRight: '8px' }}
+                                />
+                                🗣️ Thiết lập thời lượng thoại (giây)
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={120}
+                                    step={1}
+                                    value={dialogueSeconds}
+                                    onChange={(e) => setDialogueSeconds(e.target.value)}
+                                    disabled={!enableDialogueSeconds}
+                                    className="story-select"
+                                    style={{ width: '120px' }}
+                                />
+                                <span className="hint-text">Ví dụ: 8 = thoại dài khoảng 8 giây</span>
+                            </div>
                         </div>
 
                         {/* Progress Bar */}

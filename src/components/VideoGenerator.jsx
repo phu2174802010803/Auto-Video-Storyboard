@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import VideoPlayer from './VideoPlayer';
 import './VideoGenerator.css';
 
 const VideoGenerator = () => {
@@ -18,12 +19,43 @@ const VideoGenerator = () => {
     const [selectedPromptId, setSelectedPromptId] = useState(''); // Changed from selectedStoryId
     const [promptHistory, setPromptHistory] = useState([]); // Load from veo-prompt-history
     const [prompts, setPrompts] = useState([]);
-    const [autoSave, setAutoSave] = useState(false);
-    const [savePath, setSavePath] = useState('');
+    const [selectedPrompts, setSelectedPrompts] = useState(new Set()); // Track selected prompts
+    const [autoSave, setAutoSave] = useState(true); // Mặc định bật auto-save
+    const [savePath, setSavePath] = useState(() => {
+        // Load default save path from localStorage
+        return localStorage.getItem('veo3-default-save-path') || '';
+    });
     const [isRunning, setIsRunning] = useState(false);
     const [overallProgress, setOverallProgress] = useState({ current: 0, total: 0 });
     const [videoProgress, setVideoProgress] = useState({});
     const [logs, setLogs] = useState([]);
+    const [shouldSaveHistory, setShouldSaveHistory] = useState(false); // Flag to trigger history save
+
+    // Frame extraction for scene continuity
+    const [extractedFrames, setExtractedFrames] = useState({}); // Store extracted frames for each prompt
+
+    // Video Configuration
+    const [videoConfig, setVideoConfig] = useState({
+        aspectRatio: '16:9', // 16:9 or 9:16
+        model: 'veo3-fast', // veo3-fast, veo3-quality, veo2-fast, veo2-quality
+        outputCount: 1, // Number of videos per prompt
+        useExtractedFrames: true // Use extracted frames for continuity
+    });
+
+    // Calculate credits based on configuration
+    const calculateCredits = (config) => {
+        const creditMap = {
+            'veo3-fast': 20,
+            'veo3-quality': 100,
+            'veo2-fast': 20,
+            'veo2-quality': 100
+        };
+
+        const baseCredits = creditMap[config.model] || 20;
+        return baseCredits * config.outputCount;
+    };
+
+    const totalCredits = calculateCredits(videoConfig);
 
     // Tab 2: History
     const [videoHistory, setVideoHistory] = useState([]);
@@ -54,6 +86,41 @@ const VideoGenerator = () => {
             }
         }
     }, []);
+
+    // Auto-save history when video generation completes
+    useEffect(() => {
+        if (shouldSaveHistory && !isRunning) {
+            // Only save if we have video data
+            if (Object.keys(videoProgress).length > 0 || logs.length > 0) {
+                const promptItem = promptHistory.find(p => p.id === Number(selectedPromptId));
+                const selectedAccount = veo3Accounts.find(acc => acc.id.toString() === selectedAccountId);
+
+                const historyItem = {
+                    id: Date.now(),
+                    timestamp: new Date().toISOString(),
+                    promptId: Number(selectedPromptId),
+                    storyId: promptItem?.storyId,
+                    storyTitle: promptItem?.storyTitle || 'Unknown',
+                    accountName: selectedAccount?.name || 'Unknown',
+                    totalVideos: prompts.filter(p => p.type === 'scene' && selectedPrompts.has(p.id)).length,
+                    successCount: Object.values(videoProgress).filter(p => p.status === 'success').length,
+                    logs: [...logs],
+                    videoProgress: { ...videoProgress },
+                    extractedFrames: { ...extractedFrames } // Save extracted frames for history
+                };
+
+                setVideoHistory(prevHistory => {
+                    const updatedHistory = [historyItem, ...prevHistory];
+                    localStorage.setItem('veo3-video-history', JSON.stringify(updatedHistory));
+                    return updatedHistory;
+                });
+
+                setShouldSaveHistory(false);
+            } else {
+                setShouldSaveHistory(false);
+            }
+        }
+    }, [shouldSaveHistory, isRunning, videoProgress, logs, selectedPromptId, promptHistory, veo3Accounts, selectedAccountId, prompts, selectedPrompts, extractedFrames]);
 
     // Load veo3 accounts when component mounts
     useEffect(() => {
@@ -106,8 +173,13 @@ const VideoGenerator = () => {
                 currentSection = 'setting';
                 currentContent = [line];
             }
-            // Detect Scene sections
-            else if (line.match(/🎞️.*PROMPT.*Scene/i) || line.match(/PROMPT.*Scene/i)) {
+            // Detect Scene sections - support both old and new format (including sub-scenes like 1.1, 1.2)
+            else if (
+                line.match(/🎞️.*PROMPT.*Scene/i) ||
+                line.match(/PROMPT.*Scene/i) ||
+                line.match(/🎞️\s*Scene\s*\d+(\.\d+)?/i) ||  // Support Scene 1, Scene 1.1, Scene 1.2
+                line.match(/^Scene\s*\d+(\.\d+)?/i)
+            ) {
                 // Save SETTING CHUNG if we were in that section
                 if (currentSection === 'setting' && currentContent.length > 0) {
                     settingChung = currentContent.join('\n').trim();
@@ -120,13 +192,18 @@ const VideoGenerator = () => {
                         ? `${settingChung}\n\n---\n\n${sceneContent}`
                         : sceneContent;
 
+                    // Extract scene number from content (support 1, 1.1, 1.2 format)
+                    const sceneNumberMatch = currentContent[0].match(/Scene\s*([\d.]+)/i);
+                    const sceneNumber = sceneNumberMatch ? sceneNumberMatch[1] : sceneIndex.toString();
+
                     prompts.push({
-                        id: `scene-${sceneIndex}`,
+                        id: `scene-${sceneNumber}`,
                         type: 'scene',
-                        title: `Scene ${sceneIndex}`,
+                        title: `Scene ${sceneNumber}`,
                         text: fullPrompt,
                         sceneOnly: sceneContent,
-                        originalIndex: sceneIndex
+                        originalIndex: sceneNumber,  // FIXED: Use sceneNumber (1.1, 1.2) instead of sceneIndex (1, 2, 3)
+                        sceneNumber: sceneNumber  // Add scene number for display (1.1, 1.2, etc.)
                     });
                 }
 
@@ -149,13 +226,18 @@ const VideoGenerator = () => {
                 ? `${settingChung}\n\n---\n\n${sceneContent}`
                 : sceneContent;
 
+            // Extract scene number from content (support 1, 1.1, 1.2 format)
+            const sceneNumberMatch = currentContent[0].match(/Scene\s*([\d.]+)/i);
+            const sceneNumber = sceneNumberMatch ? sceneNumberMatch[1] : sceneIndex.toString();
+
             prompts.push({
-                id: `scene-${sceneIndex}`,
+                id: `scene-${sceneNumber}`,
                 type: 'scene',
-                title: `Scene ${sceneIndex}`,
+                title: `Scene ${sceneNumber}`,
                 text: fullPrompt,
                 sceneOnly: sceneContent,
-                originalIndex: sceneIndex
+                originalIndex: sceneNumber,  // FIXED: Use sceneNumber (1.1, 1.2) instead of sceneIndex (1, 2, 3)
+                sceneNumber: sceneNumber  // Add scene number for display (1.1, 1.2, etc.)
             });
         }
 
@@ -175,9 +257,132 @@ const VideoGenerator = () => {
                 const parsedPrompts = parsePromptsFromContent(promptItem.content);
                 console.log('[VideoGenerator] Parsed prompts count:', parsedPrompts.length);
                 setPrompts(parsedPrompts);
+
+                // Auto-select all scene prompts
+                const scenePrompts = parsedPrompts.filter(p => p.type === 'scene');
+                setSelectedPrompts(new Set(scenePrompts.map(p => p.id)));
             }
         } else {
             setPrompts([]);
+            setSelectedPrompts(new Set());
+        }
+    };
+
+    // Handle individual prompt selection
+    const handlePromptToggle = (promptId) => {
+        const newSelected = new Set(selectedPrompts);
+        if (newSelected.has(promptId)) {
+            newSelected.delete(promptId);
+        } else {
+            newSelected.add(promptId);
+        }
+        setSelectedPrompts(newSelected);
+    };
+
+    // Handle select all prompts
+    const handleSelectAll = () => {
+        const scenePrompts = prompts.filter(p => p.type === 'scene');
+        setSelectedPrompts(new Set(scenePrompts.map(p => p.id)));
+    };
+
+    // Handle deselect all prompts
+    const handleDeselectAll = () => {
+        setSelectedPrompts(new Set());
+    };
+
+    // Capture frame from video at the end (last frame) and save to file
+    const captureVideoFrame = async (videoUrl, promptId) => {
+        try {
+            console.log('[VideoGenerator] Capturing frame for prompt:', promptId, 'from video:', videoUrl);
+
+            // Create a video element to load and capture frame
+            const video = document.createElement('video');
+            video.crossOrigin = 'anonymous';
+            video.preload = 'metadata';
+
+            // Wait for video to load metadata
+            await new Promise((resolve, reject) => {
+                video.onloadedmetadata = resolve;
+                video.onerror = reject;
+                video.src = videoUrl.startsWith('http') ? videoUrl : `local://${encodeURIComponent(videoUrl)}`;
+            });
+
+            // Set to last frame
+            video.currentTime = video.duration - 0.1; // Slightly before end to ensure we get a frame
+
+            // Wait for seek to complete
+            await new Promise((resolve) => {
+                video.onseeked = resolve;
+                video.onerror = resolve; // Continue even if seek fails
+            });
+
+            // Create canvas and capture frame
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            ctx.drawImage(video, 0, 0);
+
+            // Convert to ArrayBuffer
+            const arrayBuffer = await new Promise(resolve => {
+                canvas.toBlob(blob => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsArrayBuffer(blob);
+                }, 'image/jpeg', 0.8);
+            });
+
+            if (!arrayBuffer || !savePath) {
+                console.error('[VideoGenerator] ❌ No arrayBuffer or save path');
+                return null;
+            }
+
+            // Generate filename for frame
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `frame_scene_${promptId}_${timestamp}.jpg`;
+
+            // Save file using electron API
+            const result = await window.electronAPI.saveFrameFile({
+                filePath: `${savePath}/${filename}`,
+                arrayBuffer: arrayBuffer
+            });
+
+            if (result.success) {
+                const frameFilePath = result.filePath;
+
+                // Extract scene key from promptId (supports decimals e.g., "scene-1.1")
+                const sceneKeyMatch = promptId.match(/scene-([\d.]+)/i);
+                const sceneKey = sceneKeyMatch ? sceneKeyMatch[1] : null;
+
+                if (sceneKey) {
+                    setExtractedFrames(prev => ({
+                        ...prev,
+                        [sceneKey]: frameFilePath
+                    }));
+                } else {
+                    console.warn('[VideoGenerator] ⚠️ Could not extract scene key from promptId:', promptId);
+                }
+
+                return frameFilePath;
+            } else {
+                console.error('[VideoGenerator] ❌ Failed to save frame file:', result.error);
+                return null;
+            }
+
+        } catch (error) {
+            console.error('[VideoGenerator] ❌ Error capturing frame:', error);
+            return null;
+        }
+    };
+
+    // Auto-capture frame when video generation completes
+    const autoCaptureFrameForNextScene = async (completedPromptId, videoUrl) => {
+        try {
+            if (!videoUrl) return;
+            await captureVideoFrame(videoUrl, completedPromptId);
+        } catch (error) {
+            console.error('[VideoGenerator] ❌ Error in auto-capture:', error);
         }
     };
 
@@ -195,9 +400,44 @@ const VideoGenerator = () => {
         }
     };
 
+    // Set default save folder
+    const handleSetDefaultFolder = async () => {
+        try {
+            const result = await window.electronAPI.selectDownloadDirectory();
+            if (result && result.success && result.path) {
+                setSavePath(result.path);
+                localStorage.setItem('veo3-default-save-path', result.path);
+                success('Đã set thư mục mặc định!');
+            }
+        } catch (error) {
+            console.error('Error setting default folder:', error);
+            showError('Lỗi khi set thư mục mặc định!');
+        }
+    };
+
+    // Open video save folder
+    const handleOpenVideoFolder = async () => {
+        try {
+            if (savePath) {
+                await window.electronAPI.openFile(savePath);
+            } else {
+                warning('Chưa chọn thư mục lưu video!');
+            }
+        } catch (error) {
+            console.error('Error opening folder:', error);
+            showError('Lỗi khi mở thư mục!');
+        }
+    };
+
     // Setup Veo3 log listener
     useEffect(() => {
+        if (!window.electronAPI || !window.electronAPI.onVeo3Log) {
+            console.error('[VideoGenerator] ❌ electronAPI.onVeo3Log is not available!');
+            return;
+        }
+
         const unsubscribe = window.electronAPI.onVeo3Log((logData) => {
+
             const timestamp = new Date().toLocaleTimeString('vi-VN');
             const newLog = {
                 timestamp,
@@ -211,13 +451,35 @@ const VideoGenerator = () => {
 
             // Update video progress
             if (logData.promptId) {
-                setVideoProgress(prev => ({
-                    ...prev,
-                    [logData.promptId]: {
-                        status: logData.status,
-                        videoUrl: logData.videoUrl
+                setVideoProgress(prev => {
+                    const existingProgress = prev[logData.promptId];
+
+                    // CRITICAL: Don't overwrite 'success' status with 'processing'
+                    // Only update if:
+                    // 1. No existing progress, OR
+                    // 2. New status is 'success' or 'error', OR
+                    // 3. Existing status is not 'success' (allow processing -> processing updates)
+                    const shouldUpdate =
+                        !existingProgress ||
+                        logData.status === 'success' ||
+                        logData.status === 'error' ||
+                        existingProgress.status !== 'success';
+
+                    if (!shouldUpdate) {
+                        // Don't update - keep existing success status
+                        return prev;
                     }
-                }));
+
+                    const updated = {
+                        ...prev,
+                        [logData.promptId]: {
+                            status: logData.status,
+                            videoUrl: logData.videoUrl || existingProgress?.videoUrl, // Keep existing videoUrl if new one is empty
+                            message: logData.message
+                        }
+                    };
+                    return updated;
+                });
             }
 
             // Update overall progress
@@ -226,6 +488,15 @@ const VideoGenerator = () => {
                     ...prev,
                     current: prev.current + 1
                 }));
+
+                // Auto-capture frame for next scene continuity
+                // ONLY capture when video is saved locally (not Google Storage URL which causes CORS)
+                // CRITICAL: Reduce delay to 500ms (was 2000ms) to capture frame ASAP before next scene starts
+                if (logData.promptId && logData.videoUrl && !logData.videoUrl.startsWith('http')) {
+                    setTimeout(() => {
+                        autoCaptureFrameForNextScene(logData.promptId, logData.videoUrl);
+                    }, 500); // Giảm từ 2000ms xuống 500ms để capture frame nhanh hơn
+                }
             }
         });
 
@@ -246,8 +517,8 @@ const VideoGenerator = () => {
             return;
         }
 
-        if (autoSave && !savePath) {
-            warning('Vui lòng chọn thư mục lưu video!');
+        if (!savePath) {
+            warning('Vui lòng chọn thư mục lưu video trước khi tạo!');
             return;
         }
 
@@ -257,11 +528,11 @@ const VideoGenerator = () => {
             return;
         }
 
-        // Filter out setting prompts (only create videos for scenes)
-        const videoPrompts = prompts.filter(p => p.type === 'scene');
+        // Filter out setting prompts and only include selected prompts
+        const videoPrompts = prompts.filter(p => p.type === 'scene' && selectedPrompts.has(p.id));
 
         if (videoPrompts.length === 0) {
-            warning('Không có scene nào để tạo video!');
+            warning('Vui lòng chọn ít nhất một scene để tạo video!');
             return;
         }
 
@@ -271,11 +542,46 @@ const VideoGenerator = () => {
         setOverallProgress({ current: 0, total: videoPrompts.length });
 
         try {
+            // Prepare prompts with extracted frames for continuity (optional)
+            const promptsWithFrames = videoPrompts.map((prompt, index) => {
+                // Use index in the current batch (0-based), not originalIndex
+                // Scene 1 (index=0) → no frame
+                // Scene 2 (index=1) → frame from Scene 1 (originalIndex of prompts[0])
+                // Scene 3 (index=2) → frame from Scene 2 (originalIndex of prompts[1])
+
+                let extractedFrame = null;
+                if (videoConfig.useExtractedFrames && index > 0) {
+                    // Get the previous prompt in the CURRENT batch
+                    const previousPrompt = videoPrompts[index - 1];
+                    if (previousPrompt && previousPrompt.originalIndex) {
+                        // Look up frame using previous prompt's originalIndex
+                        extractedFrame = extractedFrames[previousPrompt.originalIndex] || null;
+                    }
+                }
+
+                // Create enhanced prompt text with frame information
+                let enhancedPromptText = prompt.text;
+                if (videoConfig.useExtractedFrames && extractedFrame) {
+                    // Add frame file path information to the prompt
+                    enhancedPromptText = `[FRAME_FILE:${extractedFrame}]\n${prompt.text}`;
+                }
+
+                return {
+                    ...prompt,
+                    text: enhancedPromptText,
+                    extractedFrame: videoConfig.useExtractedFrames ? extractedFrame : null, // Include frame data for backend processing
+                    sceneIndex: prompt.originalIndex, // Keep original scene number for reference
+                    batchIndex: index // Add batch index for debugging
+                };
+            });
+
+
             const result = await window.electronAPI.startVeo3Automation({
-                prompts: videoPrompts,
+                prompts: promptsWithFrames,
                 cookieString: selectedAccount.cookie,
+                videoConfig: videoConfig,
                 autoSaveConfig: {
-                    enabled: autoSave,
+                    enabled: true, // Luôn bật auto-save
                     path: savePath
                 }
             });
@@ -283,25 +589,11 @@ const VideoGenerator = () => {
             if (result.success) {
                 success(`Hoàn thành! Đã xử lý ${result.processed}/${result.total} video`);
 
-                // Get prompt info for history
-                const promptItem = promptHistory.find(p => p.id === Number(selectedPromptId));
-
-                // Save to history
-                const historyItem = {
-                    id: Date.now(),
-                    timestamp: new Date().toISOString(),
-                    promptId: Number(selectedPromptId),
-                    storyId: promptItem?.storyId,
-                    storyTitle: promptItem?.storyTitle || 'Unknown',
-                    accountName: selectedAccount.name,
-                    totalVideos: result.total,
-                    successCount: result.processed,
-                    logs: logs
-                };
-
-                const updatedHistory = [historyItem, ...videoHistory];
-                setVideoHistory(updatedHistory);
-                localStorage.setItem('veo3-video-history', JSON.stringify(updatedHistory));
+                // Trigger auto-save history via useEffect
+                // Wait for frame extraction to complete (frame capture has 2s delay)
+                setTimeout(() => {
+                    setShouldSaveHistory(true);
+                }, 3500);
             } else {
                 showError(`Lỗi: ${result.error}`);
             }
@@ -332,7 +624,144 @@ const VideoGenerator = () => {
             const updated = videoHistory.filter(h => h.id !== id);
             setVideoHistory(updated);
             localStorage.setItem('veo3-video-history', JSON.stringify(updated));
+
+            // If deleted item was currently selected, reset selection
+            if (selectedPromptId === id.toString()) {
+                setSelectedPromptId('');
+                setPrompts([]);
+                setSelectedPrompts(new Set());
+                setVideoProgress({});
+                setLogs([]);
+                setOverallProgress({ current: 0, total: 0 });
+            }
+
             success('Đã xóa lịch sử!');
+        }
+    };
+
+    // Reset to default state
+    const handleResetToDefault = () => {
+        if (confirm('Bạn có chắc muốn reset về mặc định? Tất cả dữ liệu sẽ bị xóa!')) {
+            // Reset all states
+            setSelectedAccountId('');
+            setSelectedPromptId('');
+            setPrompts([]);
+            setSelectedPrompts(new Set());
+            setAutoSave(false);
+            setSavePath('');
+            setVideoProgress({});
+            setLogs([]);
+            setOverallProgress({ current: 0, total: 0 });
+
+            success('Đã reset về mặc định!');
+        }
+    };
+
+    // Load history item - restore video generation state
+    const handleLoadHistoryItem = (item) => {
+
+        setActiveTab('create');
+        setSelectedPromptId(item.promptId.toString());
+
+        // Parse and set prompts from prompt history
+        const promptItem = promptHistory.find(p => p.id === item.promptId);
+
+        if (!promptItem) {
+            showError('Không tìm thấy prompt trong lịch sử!');
+            return;
+        }
+
+        const parsedPrompts = parsePromptsFromContent(promptItem.content);
+        const scenePrompts = parsedPrompts.filter(p => p.type === 'scene');
+
+        // Set prompts and selections
+        setPrompts(parsedPrompts);
+        setSelectedPrompts(new Set(scenePrompts.map(p => p.id)));
+
+        // Restore video progress with correct prompt ID mapping
+        let restoredProgress = {};
+
+        if (item.videoProgress && Object.keys(item.videoProgress).length > 0) {
+            // Map old prompt IDs to new prompt IDs based on position
+            const oldProgressKeys = Object.keys(item.videoProgress);
+
+            scenePrompts.forEach((prompt, index) => {
+                // Map by position in the array
+                if (index < oldProgressKeys.length) {
+                    const oldKey = oldProgressKeys[index];
+                    const oldProgress = item.videoProgress[oldKey];
+                    // Only restore if status is 'success' or 'error' (final states)
+                    if (oldProgress && (oldProgress.status === 'success' || oldProgress.status === 'error')) {
+                        restoredProgress[prompt.id] = oldProgress;
+                    }
+                }
+            });
+
+            setVideoProgress(restoredProgress);
+        } else if (item.logs && item.logs.length > 0) {
+            // Fallback: restore from logs - find LAST success log for each unique promptId
+
+            // Group logs by promptId and get last success for each
+            const logsByPromptId = {};
+            item.logs.forEach(log => {
+                if (log.promptId && log.status === 'success' && log.videoUrl) {
+                    // Keep overwriting with later logs - last one wins
+                    logsByPromptId[log.promptId] = {
+                        status: log.status,
+                        videoUrl: log.videoUrl,
+                        message: log.message
+                    };
+                }
+            });
+
+            // Map to current scene prompts by index
+            const oldPromptIds = Object.keys(logsByPromptId);
+            scenePrompts.forEach((prompt, index) => {
+                if (index < oldPromptIds.length) {
+                    const oldPromptId = oldPromptIds[index];
+                    restoredProgress[prompt.id] = logsByPromptId[oldPromptId];
+                }
+            });
+
+            setVideoProgress(restoredProgress);
+        } else {
+            setVideoProgress({});
+        }
+
+        // Debug: Log what we're restoring
+        console.log('[VideoGenerator] Restoring videoProgress:', Object.keys(restoredProgress).length, 'items');
+        Object.entries(restoredProgress).forEach(([id, prog]) => {
+            console.log(`[VideoGenerator] - ${id}: status=${prog.status}, hasVideoUrl=${!!prog.videoUrl}`);
+        });
+
+        // Restore logs (without triggering real-time updates)
+        // NOTE: We restore videoProgress first, then logs
+        // The listener logic will NOT overwrite 'success' status with 'processing' from old logs
+        if (item.logs) {
+            setLogs(item.logs);
+        } else {
+            setLogs([]);
+        }
+
+        // Restore extracted frames - IMPORTANT: Do this AFTER setting prompts
+        if (item.extractedFrames && Object.keys(item.extractedFrames).length > 0) {
+            setExtractedFrames(item.extractedFrames);
+        } else {
+            setExtractedFrames({});
+        }
+
+        const videoCount = item.videoProgress ? Object.keys(item.videoProgress).length :
+            item.logs ? item.logs.filter(log => log.status === 'success').length : 0;
+        const frameCount = item.extractedFrames ? Object.keys(item.extractedFrames).length : 0;
+
+        if (videoCount > 0 || frameCount > 0) {
+            let message = 'Đã khôi phục từ lịch sử: ';
+            const parts = [];
+            if (videoCount > 0) parts.push(`${videoCount} video`);
+            if (frameCount > 0) parts.push(`${frameCount} khung hình`);
+            success(message + parts.join(', ') + '!');
+        } else {
+            success('Đã tải prompt từ lịch sử!');
         }
     };
 
@@ -442,59 +871,147 @@ const VideoGenerator = () => {
                                 <div className="prompts-preview success">
                                     <p className="preview-label">
                                         ✅ Đã tải <strong>{prompts.length}</strong> prompts
-                                        (Sẽ tạo <strong>{prompts.filter(p => p.type === 'scene').length}</strong> video)
+                                        (Sẽ tạo <strong>{prompts.filter(p => p.type === 'scene').length * videoConfig.outputCount}</strong> video)
                                     </p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Auto-save Settings */}
+                        {/* Video Configuration */}
                         <div className="form-group">
-                            <label className="toggle-label">
-                                <input
-                                    type="checkbox"
-                                    checked={autoSave}
-                                    onChange={(e) => setAutoSave(e.target.checked)}
-                                    disabled={isRunning}
-                                />
-                                <span>💾 Tự động lưu video sau khi tạo</span>
-                            </label>
-                            {autoSave && (
-                                <div className="save-path-group">
-                                    <button
-                                        onClick={handleSelectFolder}
-                                        className="btn-secondary"
+                            <label>⚙️ Cấu Hình Video:</label>
+                            <div className="config-grid">
+                                {/* Aspect Ratio */}
+                                <div className="config-item">
+                                    <label className="config-label">Tỷ lệ khung hình:</label>
+                                    <select
+                                        value={videoConfig.aspectRatio}
+                                        onChange={(e) => setVideoConfig(prev => ({ ...prev, aspectRatio: e.target.value }))}
+                                        className="config-select"
                                         disabled={isRunning}
                                     >
-                                        📁 Chọn Thư Mục
-                                    </button>
-                                    {savePath && (
-                                        <span className="save-path-display">
-                                            Lưu tại: {savePath}
+                                        <option value="16:9">Khổ ngang (16:9)</option>
+                                        <option value="9:16">Khổ dọc (9:16)</option>
+                                    </select>
+                                </div>
+
+                                {/* Model Selection */}
+                                <div className="config-item">
+                                    <label className="config-label">Mô hình:</label>
+                                    <select
+                                        value={videoConfig.model}
+                                        onChange={(e) => setVideoConfig(prev => ({ ...prev, model: e.target.value }))}
+                                        className="config-select"
+                                        disabled={isRunning}
+                                    >
+                                        <option value="veo3-fast">Veo 3.1 - Fast</option>
+                                        <option value="veo3-quality">Veo 3 - Quality</option>
+                                        <option value="veo2-fast">Veo 2 - Fast</option>
+                                        <option value="veo2-quality">Veo 2 - Quality</option>
+                                    </select>
+                                </div>
+
+                                {/* Output Count */}
+                                <div className="config-item">
+                                    <label className="config-label">Số video mỗi prompt:</label>
+                                    <select
+                                        value={videoConfig.outputCount}
+                                        onChange={(e) => setVideoConfig(prev => ({ ...prev, outputCount: parseInt(e.target.value) }))}
+                                        className="config-select"
+                                        disabled={isRunning}
+                                    >
+                                        <option value={1}>1</option>
+                                        <option value={2}>2</option>
+                                        <option value={3}>3</option>
+                                        <option value={4}>4</option>
+                                    </select>
+                                </div>
+
+                                {/* Use Extracted Frames Toggle */}
+                                <div className="config-item">
+                                    <label className="config-label">Đồng nhất nhân vật (dùng frame trước):</label>
+                                    <label className="checkbox-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={videoConfig.useExtractedFrames}
+                                            onChange={(e) => setVideoConfig(prev => ({ ...prev, useExtractedFrames: e.target.checked }))}
+                                            disabled={isRunning}
+                                        />
+                                        <span>
+                                            {videoConfig.useExtractedFrames ? 'Bật: Sử dụng khung hình từ scene trước' : 'Tắt: Không upload frame (tạo bình thường)'}
                                         </span>
-                                    )}
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Credit Information */}
+                            <div className="credit-info">
+                                <p className="credit-text">
+                                    Dựa trên chế độ cài đặt hiện tại, bạn cần dùng <strong>{totalCredits} tín dụng</strong> cho mỗi lần tạo.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Thư mục lưu trữ (Bắt buộc) */}
+                        <div className="form-group">
+                            <label>📁 Thư mục lưu trữ video (Bắt buộc):</label>
+                            <div className="save-path-group">
+                                <button
+                                    onClick={handleSelectFolder}
+                                    className="btn-secondary"
+                                    disabled={isRunning}
+                                >
+                                    📁 Chọn Thư Mục
+                                </button>
+                                <button
+                                    onClick={handleSetDefaultFolder}
+                                    className="btn-secondary"
+                                    disabled={isRunning}
+                                    title="Set làm thư mục mặc định cho lần sau"
+                                >
+                                    ⭐ Set Mặc Định
+                                </button>
+                            </div>
+                            {savePath ? (
+                                <div className="save-path-display success">
+                                    ✅ Lưu tại: {savePath}
+                                </div>
+                            ) : (
+                                <div className="save-path-display error">
+                                    ❌ Chưa chọn thư mục lưu trữ
                                 </div>
                             )}
                         </div>
 
                         {/* Action Buttons */}
                         <div className="action-buttons">
-                            {!isRunning ? (
+                            <div className="action-buttons-main">
+                                {!isRunning ? (
+                                    <button
+                                        onClick={handleStart}
+                                        disabled={!selectedAccountId || selectedPrompts.size === 0 || !savePath}
+                                        className="btn-primary"
+                                    >
+                                        🚀 Bắt Đầu Tạo Video ({selectedPrompts.size * videoConfig.outputCount} video)
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleStop}
+                                        className="btn-danger"
+                                    >
+                                        🛑 Dừng Lại
+                                    </button>
+                                )}
+                            </div>
+                            <div className="action-buttons-secondary">
                                 <button
-                                    onClick={handleStart}
-                                    disabled={!selectedAccountId || prompts.length === 0}
-                                    className="btn-primary"
+                                    onClick={handleResetToDefault}
+                                    className="btn-secondary"
+                                    disabled={isRunning}
                                 >
-                                    🚀 Bắt Đầu Tạo Video
+                                    🔄 Reset Mặc Định
                                 </button>
-                            ) : (
-                                <button
-                                    onClick={handleStop}
-                                    className="btn-danger"
-                                >
-                                    🛑 Dừng Lại
-                                </button>
-                            )}
+                            </div>
                         </div>
                     </div>
 
@@ -503,9 +1020,28 @@ const VideoGenerator = () => {
                         <div className="results-section">
                             <div className="section-header-bar">
                                 <h2>📊 Danh Sách Prompts</h2>
-                                <span className="prompts-count">
-                                    {prompts.filter(p => p.type === 'scene').length} scenes sẵn sàng
-                                </span>
+                                <div className="prompts-controls">
+                                    <span className="prompts-count">
+                                        {selectedPrompts.size}/{prompts.filter(p => p.type === 'scene').length} scenes được chọn
+                                        ({selectedPrompts.size * videoConfig.outputCount} video)
+                                    </span>
+                                    <div className="selection-buttons">
+                                        <button
+                                            onClick={handleSelectAll}
+                                            disabled={isRunning || prompts.filter(p => p.type === 'scene').length === 0}
+                                            className="btn-secondary small"
+                                        >
+                                            ✅ Chọn Tất Cả
+                                        </button>
+                                        <button
+                                            onClick={handleDeselectAll}
+                                            disabled={isRunning || selectedPrompts.size === 0}
+                                            className="btn-secondary small"
+                                        >
+                                            ❌ Bỏ Chọn Tất Cả
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Prompt Cards Grid - Only scenes, each includes SETTING CHUNG */}
@@ -514,26 +1050,58 @@ const VideoGenerator = () => {
                                     const progress = videoProgress[prompt.id];
                                     const statusClass = progress?.status || 'ready';
 
+                                    // Check if this scene should show extracted frame from previous scene
+                                    const sceneIndex = prompt.originalIndex; // can be "1" or "1.1"
+                                    // Look up previous scene key properly (handles sub-scenes)
+                                    let prevSceneKey = null;
+                                    if (typeof sceneIndex === 'string' && sceneIndex.includes('.')) {
+                                        const [main, sub] = sceneIndex.split('.');
+                                        const subNum = parseInt(sub, 10);
+                                        if (!isNaN(subNum) && subNum > 1) {
+                                            prevSceneKey = `${main}.${subNum - 1}`; // 1.2 -> 1.1
+                                        } else {
+                                            const mainNum = parseInt(main, 10);
+                                            if (!isNaN(mainNum) && mainNum > 1) prevSceneKey = String(mainNum - 1); // 2.1 -> 1
+                                        }
+                                    } else {
+                                        const num = parseInt(sceneIndex, 10);
+                                        if (!isNaN(num) && num > 1) prevSceneKey = String(num - 1); // 2 -> 1
+                                    }
+
+                                    const extractedFrame = prevSceneKey ? extractedFrames[prevSceneKey] : null;
+
                                     return (
                                         <div key={prompt.id} className={`prompt-card scene ${statusClass}`}>
                                             <div className="prompt-card-header">
                                                 <div className="prompt-card-title-row">
                                                     <input
                                                         type="checkbox"
-                                                        checked={true}
-                                                        onChange={() => { }} // Add empty handler to fix warning
+                                                        checked={selectedPrompts.has(prompt.id)}
+                                                        onChange={() => handlePromptToggle(prompt.id)}
                                                         disabled={isRunning}
                                                         className="prompt-checkbox"
-                                                        readOnly
                                                     />
                                                     <h4 className="prompt-card-title">
-                                                        🎞️ Scene {prompt.originalIndex}
+                                                        🎞️ Scene {prompt.sceneNumber || prompt.originalIndex}
+                                                        {extractedFrame && (
+                                                            <span className="frame-indicator">📸</span>
+                                                        )}
                                                     </h4>
                                                 </div>
                                                 <div className="prompt-card-actions">
                                                     <span className="ready-badge">
                                                         🧱 + Scene
                                                     </span>
+                                                    {prompt.sceneNumber && prompt.sceneNumber.includes('.') && (
+                                                        <span className="sub-scene-badge" title="Prompt con của cùng 1 cảnh">
+                                                            🔗 Prompt con
+                                                        </span>
+                                                    )}
+                                                    {extractedFrame && (
+                                                        <span className="frame-badge">
+                                                            📷 Frame từ Scene {prevSceneKey}
+                                                        </span>
+                                                    )}
                                                     {statusClass !== 'ready' && (
                                                         <span className={`status-badge badge-${statusClass}`}>
                                                             {statusClass === 'waiting' && '⏳'}
@@ -546,14 +1114,141 @@ const VideoGenerator = () => {
                                             </div>
 
                                             <div className="prompt-card-body">
+                                                {/* Display extracted frame from previous scene */}
+                                                {extractedFrame && (
+                                                    <div className="extracted-frame-display">
+                                                        <div className="frame-header">
+                                                            <span className="frame-label">📷 Khung hình từ Scene {prevSceneKey}</span>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (confirm('Bạn có chắc muốn xóa khung hình này?')) {
+                                                                        try {
+                                                                            // Delete file from disk
+                                                                            const deleteResult = await window.electronAPI.deleteFile(extractedFrame);
+                                                                            if (deleteResult.success) {
+                                                                                // Remove using the exact previous scene key
+                                                                                setExtractedFrames(prev => {
+                                                                                    const updated = { ...prev };
+                                                                                    if (prevSceneKey) delete updated[prevSceneKey];
+                                                                                    return updated;
+                                                                                });
+                                                                                success('Đã xóa khung hình!');
+                                                                            } else {
+                                                                                showError('Lỗi khi xóa khung hình từ ổ đĩa!');
+                                                                            }
+                                                                        } catch (error) {
+                                                                            console.error('Error deleting frame file:', error);
+                                                                            showError('Lỗi khi xóa khung hình!');
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="btn-remove-frame"
+                                                                title="Xóa khung hình này"
+                                                            >
+                                                                ❌
+                                                            </button>
+                                                        </div>
+                                                        <div className="frame-preview">
+                                                            <img
+                                                                src={`local://${encodeURIComponent(extractedFrame)}`}
+                                                                alt={`Frame từ Scene ${sceneIndex - 1}`}
+                                                                className="extracted-frame-image"
+                                                                onError={(e) => {
+                                                                    console.error('[VideoGenerator] ❌ Failed to load frame image:', extractedFrame);
+                                                                    e.target.style.display = 'none';
+                                                                    e.target.parentElement.innerHTML = `<p style="color: #ff6b6b; text-align: center;">❌ Không thể tải khung hình<br/><small>${extractedFrame}</small></p>`;
+                                                                }}
+                                                                onLoad={() => {
+                                                                    console.log('[VideoGenerator] ✅ Frame image loaded successfully:', extractedFrame);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="frame-info">
+                                                            <small>
+                                                                File: {extractedFrame.split('/').pop()}<br />
+                                                                Khung hình cuối sẽ được sử dụng làm ảnh đầu vào cho scene này
+                                                            </small>
+                                                            <div className="frame-actions">
+                                                                <button
+                                                                    onClick={() => window.electronAPI.openFile(extractedFrame)}
+                                                                    className="btn-open-frame"
+                                                                    title="Mở khung hình trong thư mục"
+                                                                >
+                                                                    📁 Mở File
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <div className="prompt-preview-box">
-                                                    <p className="preview-label">Kết quả sẽ hiển thị ở đây</p>
+                                                    {progress?.status === 'processing' ? (
+                                                        <div className="video-progress-display">
+                                                            <div className="progress-spinner">
+                                                                <div className="spinner"></div>
+                                                            </div>
+                                                            <p className="progress-text">Đang tạo video...</p>
+                                                            <p className="progress-subtext">Vui lòng đợi trong giây lát</p>
+                                                        </div>
+                                                    ) : progress?.status === 'success' ? (
+                                                        <div className="video-preview-container">
+                                                            {progress.videoUrl && (() => {
+                                                                // Check if it's a local MP4 file
+                                                                const isLocalMp4 = !progress.videoUrl.startsWith('http') &&
+                                                                    progress.videoUrl.toLowerCase().endsWith('.mp4');
+                                                                const isMp4Url = progress.videoUrl.toLowerCase().includes('.mp4');
+
+                                                                if (isLocalMp4 || isMp4Url) {
+                                                                    // Use custom VideoPlayer for MP4 files
+                                                                    return (
+                                                                        <VideoPlayer
+                                                                            videoUrl={progress.videoUrl}
+                                                                            promptId={prompt.id}
+                                                                            onCaptureFrame={captureVideoFrame}
+                                                                        />
+                                                                    );
+                                                                } else {
+                                                                    // Not MP4 or unsupported format
+                                                                    return (
+                                                                        <div className="video-info-container">
+                                                                            <p className="video-format-info">
+                                                                                📁 File: {progress.videoUrl.split('/').pop()}
+                                                                            </p>
+                                                                            <button
+                                                                                onClick={() => window.open(progress.videoUrl, '_blank')}
+                                                                                className="btn-view-video-small"
+                                                                            >
+                                                                                👁️ Mở File
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                            })()}
+                                                        </div>
+                                                    ) : progress?.status === 'error' ? (
+                                                        <div className="video-error-display">
+                                                            <div className="error-icon">❌</div>
+                                                            <p className="error-text">Lỗi khi tạo video</p>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="preview-label">Kết quả sẽ hiển thị ở đây</p>
+                                                    )}
                                                 </div>
                                                 <div className="prompt-text-content">
                                                     {/* Display scene-only text in card, but full text will be sent to Veo3 */}
                                                     <p className="prompt-text">{prompt.sceneOnly || prompt.text}</p>
                                                     <div className="prompt-info-badge">
                                                         💡 Prompt này bao gồm SETTING CHUNG + Scene
+                                                        {prompt.sceneNumber && prompt.sceneNumber.includes('.') && (
+                                                            <span className="continuity-info">
+                                                                + Prompt con (ghép video để có thoại đầy đủ)
+                                                            </span>
+                                                        )}
+                                                        {extractedFrame && (
+                                                            <span className="continuity-info">
+                                                                + Khung hình từ scene trước
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -561,10 +1256,10 @@ const VideoGenerator = () => {
                                             {progress?.videoUrl && (
                                                 <div className="prompt-card-footer">
                                                     <button
-                                                        onClick={() => window.open(progress.videoUrl, '_blank')}
+                                                        onClick={handleOpenVideoFolder}
                                                         className="btn-view-video"
                                                     >
-                                                        👁️ Xem Video
+                                                        📁 Mở thư mục lưu video
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -669,12 +1364,20 @@ const VideoGenerator = () => {
                                                     <span>✅ {item.successCount}/{item.totalVideos} video</span>
                                                 </p>
                                             </div>
-                                            <button
-                                                onClick={() => handleDeleteHistory(item.id)}
-                                                className="btn-delete-history"
-                                            >
-                                                🗑️
-                                            </button>
+                                            <div className="history-item-actions">
+                                                <button
+                                                    onClick={() => handleLoadHistoryItem(item)}
+                                                    className="btn-load-history"
+                                                >
+                                                    📂 Tải
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteHistory(item.id)}
+                                                    className="btn-delete-history"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="history-item-stats">
                                             <div className="stat-badge success">

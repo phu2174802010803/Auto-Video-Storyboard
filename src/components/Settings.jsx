@@ -92,6 +92,26 @@ const Settings = () => {
         }
     };
 
+    const handleTestAccount = async (account) => {
+        try {
+            success(`Đang mở browser với tài khoản ${account.name}...`);
+
+            const result = await window.electronAPI.testVeo3Account({
+                cookieString: account.cookie,
+                accountName: account.name
+            });
+
+            if (result.success) {
+                success('Browser đã mở thành công! Kiểm tra xem đã đăng nhập chưa.');
+            } else {
+                error(result.error || 'Lỗi khi mở browser!');
+            }
+        } catch (err) {
+            console.error('Test account error:', err);
+            error('Lỗi khi test tài khoản: ' + err.message);
+        }
+    };
+
     const handleDeleteAccount = (id) => {
         if (confirm('Bạn có chắc muốn xóa tài khoản này?')) {
             const updatedAccounts = veo3Accounts.filter(acc => acc.id !== id);
@@ -188,6 +208,13 @@ const Settings = () => {
                                         </div>
                                     </div>
                                     <div className="account-actions">
+                                        <button
+                                            className="btn-test"
+                                            onClick={() => handleTestAccount(account)}
+                                            title="Mở browser để test tài khoản"
+                                        >
+                                            🌐
+                                        </button>
                                         <button
                                             className="btn-delete"
                                             onClick={() => handleDeleteAccount(account.id)}

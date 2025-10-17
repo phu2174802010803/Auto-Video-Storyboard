@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const mammoth = require('mammoth');
@@ -94,7 +94,29 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    // Register custom protocol for local files
+    protocol.registerFileProtocol('local', (request, callback) => {
+        try {
+            const url = request.url.substr(8); // Remove 'local://' prefix
+            const filePath = decodeURIComponent(url);
+            console.log('[Electron] Serving local file:', filePath);
+
+            // Check if file exists
+            if (fs.existsSync(filePath)) {
+                callback({ path: filePath });
+            } else {
+                console.error('[Electron] File not found:', filePath);
+                callback({ error: -6 }); // FILE_NOT_FOUND
+            }
+        } catch (error) {
+            console.error('[Electron] Protocol error:', error);
+            callback({ error: -2 }); // FAILED
+        }
+    });
+
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
@@ -160,6 +182,17 @@ ipcMain.handle('read-file-content', async (event, filePath) => {
         return { success: true, content: content.trim() };
     } catch (error) {
         console.error('Error reading file:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Open file/folder with system default application
+ipcMain.handle('open-file', async (event, filePath) => {
+    try {
+        await shell.openPath(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error('Error opening file:', error);
         return { success: false, error: error.message };
     }
 });
@@ -833,7 +866,7 @@ ipcMain.handle('generate-metadata', async (event, { apiKey, story }) => {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash"  // Changed to stable model with higher quota
+            model: "gemini-2.5-flash-lite"  // Use highest quota model
         });
 
         const prompt = `Dựa trên storyboard video giáo dục toán học sau đây, hãy tạo metadata cho video:
@@ -892,6 +925,34 @@ ipcMain.handle('read-file', async (event, filePath) => {
         const content = fs.readFileSync(filePath, 'utf-8');
         return { success: true, content };
     } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Save frame file from ArrayBuffer data
+ipcMain.handle('save-frame-file', async (event, { filePath, arrayBuffer }) => {
+    try {
+        // Convert ArrayBuffer to buffer and write to file
+        const buffer = Buffer.from(arrayBuffer);
+        fs.writeFileSync(filePath, buffer);
+        return { success: true, filePath };
+    } catch (error) {
+        console.error('Error saving frame file:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Delete file
+ipcMain.handle('delete-file', async (event, filePath) => {
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            return { success: true };
+        } else {
+            return { success: false, error: 'File not found' };
+        }
+    } catch (error) {
+        console.error('Error deleting file:', error);
         return { success: false, error: error.message };
     }
 });
@@ -972,46 +1033,51 @@ function parseCookieForPuppeteer(cookieString) {
             continue;
         }
 
-        // Create cookie object with base fields
+        // Clean cookie value first (remove control chars)
+        let cleanValue = value.replace(/[\x00-\x1F\x7F]/g, '');
+        if (cleanValue.length !== value.length) {
+            console.warn(`[Cookie Parser] Cleaned ${value.length - cleanValue.length} control chars from ${name}`);
+        }
+
+        if (!cleanValue) {
+            console.warn(`[Cookie Parser] ⚠ Skipping empty cookie value: ${name}`);
+            continue;
+        }
+
+        // Create cookie object - SAME AS VALIDATION
         const cookie = {
             name: name,
-            value: value,
-            path: '/',
-            secure: true
+            value: cleanValue,
+            path: '/'
         };
 
         // Cookie source: https://labs.google/fx/vi/tools/flow
-        // Use '.labs.google' (with dot) as wildcard domain for all subdomains
         if (name.startsWith('__Host-')) {
-            // __Host- cookies: NO domain (will be set via CDP differently)
+            // __Host- cookies: SKIP domain field (Chrome will use page domain)
             cookie.secure = true;
             cookie.httpOnly = true;
-            cookie.domain = null; // Will be handled by CDP
-            console.log(`[Cookie Parser] __Host- cookie: ${name}`);
+            // NO domain field for __Host- cookies
+            console.log(`[Cookie Parser] __Host- cookie: ${name} (no domain)`);
         } else if (name.startsWith('__Secure-')) {
             // __Secure- cookies - use wildcard domain
             cookie.secure = true;
             cookie.httpOnly = true;
-            cookie.domain = '.labs.google'; // Wildcard domain (with dot prefix)
+            cookie.domain = '.labs.google';
             console.log(`[Cookie Parser] __Secure- cookie: ${name}`);
         } else {
             // Regular cookies - use wildcard domain
-            cookie.domain = '.labs.google'; // Wildcard domain (with dot prefix)
-            cookie.httpOnly = false;
+            cookie.domain = '.labs.google';
             console.log(`[Cookie Parser] Regular cookie: ${name}`);
         }
 
-        // Clean cookie value (keep URL encoding, just remove control chars)
-        const originalLength = cookie.value.length;
-        cookie.value = cookie.value.replace(/[\x00-\x1F\x7F]/g, '');
-        if (originalLength !== cookie.value.length) {
-            console.warn(`[Cookie Parser] Cleaned ${originalLength - cookie.value.length} control chars from ${name}`);
+        // Validate critical fields
+        if (!cookie.name || !cookie.value) {
+            console.warn(`[Cookie Parser] ⚠ Skipping invalid cookie: ${name}`);
+            continue;
         }
 
-        // Don't skip long cookies - CDP can handle them
-        // Session token is CRITICAL for authentication
         if (cookie.value.length > 4000) {
-            console.warn(`[Cookie Parser] ⚠ Warning: ${name} is very long (${cookie.value.length} chars) - will try to set via CDP`);
+            console.warn(`[Cookie Parser] ⚠ Warning: ${name} is very long (${cookie.value.length} chars)`);
         }
 
         cookies.push(cookie);
@@ -1037,7 +1103,9 @@ async function downloadVideoFromUrl(videoUrl, promptText, savePath, index) {
             .replace(/[^a-z0-9]/gi, '_')
             .substring(0, 50);
 
-        const filename = `video_${index + 1}_${sanitizedText}.mp4`;
+        // FIXED: Use index directly (works for both number and string like "1.1")
+        // No need to +1 since originalIndex is already the scene number
+        const filename = `video_${index}_${sanitizedText}.mp4`;
         const fullPath = path.join(savePath, filename);
 
         return new Promise((resolve, reject) => {
@@ -1067,8 +1135,10 @@ ipcMain.handle('generate-video-prompts', async (event, { config, apiKey }) => {
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
+        // Map model ID to actual Gemini model name
+        const modelName = config.model || 'gemini-2.5-flash-lite';
         const model = genAI.getGenerativeModel({
-            model: config.model === 'fast' ? 'gemini-1.5-flash' : 'gemini-1.5-pro'  // Changed exp to stable
+            model: modelName
         });
 
         event.sender.send('progress-update', { progress: 10, status: 'Đang tính toán số lượng prompt...' });
@@ -1271,7 +1341,7 @@ ipcMain.handle('generate-character-bible', async (event, { context, characters, 
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });  // Use highest quota model
 
         event.sender.send('progress-update', { progress: 15, status: 'Đang chuẩn bị mô tả nhân vật...' });
 
@@ -1357,7 +1427,7 @@ ipcMain.handle('generate-storyboard', async (event, { context, idea, genre, aspe
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });  // Use highest quota model
 
         const calculatedScenes = numScenes || Math.ceil(idea.length / 100); // Auto-calculate if not provided
 
@@ -1467,7 +1537,7 @@ ipcMain.handle('regenerate-scene', async (event, { context, idea, genre, aspectR
     try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });  // Changed to stable model
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });  // Use highest quota model
 
         const systemPrompt = `You are an expert storyboard creator for AI video generation.
 
@@ -1547,7 +1617,7 @@ Return a single JSON object:
 });
 
 // Generate structured video prompts from storyboard (Tab 1)
-ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey, model: selectedModel }) => {
+ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey, model: selectedModel, enableDialogueSeconds, dialogueSeconds }) => {
     try {
         event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
 
@@ -1569,198 +1639,204 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
         event.sender.send('progress-update', { progress: 10, status: 'Đang phân tích storyboard...' });
 
         // Build system prompt with detailed template
+        const dialogueDurationNote = enableDialogueSeconds && Number(dialogueSeconds) > 0
+            ? `\n\n⏱️ RÀNG BUỘC THỜI LƯỢNG THOẠI QUAN TRỌNG:\n- Mỗi cảnh phải có tổng thời lượng THOẠI kéo dài khoảng ${Number(dialogueSeconds)} giây (±1 giây)\n- Tính toán: Tốc độ đọc tiếng Việt tự nhiên ≈ 2.5-3 từ/giây\n- Số từ cần viết: ~${Math.floor(Number(dialogueSeconds) * 2.5)} - ${Math.floor(Number(dialogueSeconds) * 3)} từ\n- Chia nhỏ lời thoại theo mốc thời gian trong Beat plan\n- Đảm bảo thoại đủ dài để lấp đầy ${Number(dialogueSeconds)} giây khi đọc với giọng tự nhiên`
+            : '';
+
         const systemPrompt = `You are an expert video prompt creator for educational videos.
 
 **Task:** Generate structured video prompts following this EXACT format.
 
 **INPUT:** You will receive a storyboard with scenes, characters, and story details.
 
+📊 QUAN TRỌNG - CHIA CẢNH THEO THOẠI:
+- Mỗi prompt video chỉ tạo được ~8 giây
+- Tốc độ đọc tiếng Việt tự nhiên: ~2.5-3 từ/giây
+- Nếu thoại trong 1 cảnh > 20-25 từ → PHẢI CHIA thành nhiều prompt con
+- Ví dụ: Cảnh 1 có thoại 60 từ → Chia thành Cảnh 1.1, 1.2, 1.3 (mỗi prompt ~20 từ)
+- Các prompt con phải liên tục về hình ảnh và nội dung
+- Nhân vật giữ nguyên tư thế, biểu cảm trong các prompt con của cùng 1 cảnh
+
 **OUTPUT FORMAT:**
 
 First, generate SETTING CHUNG (general settings) - generated ONCE:
 
-🧱 SETTING CHUNG – Thông số kỹ thuật & phong cách
+🧱 SETTING CHUNG
 
-Style: Cinematic Pixar-like realism kết hợp học liệu 2D/3D. Giữ phong cách giáo dục Việt Nam, tông màu sáng ấm, chi tiết rõ nét nhưng không rối.
+Phong cách: Video hoạt hình 3D Pixar, tông màu ấm, phù hợp giáo dục học sinh VN.
 
-Location: [Extract from storyboard - Vietnamese school context]
+Địa điểm: [Lấy từ storyboard - lớp học/sân trường VN]
 
-Characters:
-  [List all main characters with brief intro from storyboard]
+Nhân vật chính:
+  [Tên nhân vật]: 
+    - Tuổi [12-14 tuổi], học sinh VN
+    - Khuôn mặt [tròn/oval], mắt [đen/nâu], da [sáng/ngăm], nụ cười [tươi/hiền]
+    - Tóc đen [ngắn gọn/dài vai, thẳng/xoăn]
+    - Mặc đồng phục: áo trắng, quần [xanh navy/váy], khăn đỏ
+    - Tính cách: [tò mò/nhiệt tình/trầm tính]
+    ⚠️ Giữ nguyên hình dáng nhân vật này trong TẤT CẢ các cảnh
 
-Character consistency control:
-  [For EACH main character, create DETAILED consistency description in this format:]
+Bối cảnh:
+  - Lớp học sáng sủa, ánh sáng tự nhiên từ cửa sổ bên trái
+  - Bàn ghế gỗ, bảng đen/trắng, cây xanh ngoài cửa sổ
+  - Không khí ấm áp, thân thiện
+  - Âm thanh nhẹ: giấy viết, bút chì, tiếng chim
+
+Góc quay: Nhìn thẳng hoặc từ trên xuống (khi vẽ hình), ổn định, không rung lắc.
+
+⛔ LƯU Ý QUAN TRỌNG: 
+  • KHÔNG hiển thị chữ/số/công thức (AI không render đúng)
+  • Thay bằng vật thể hình ảnh + nhân vật nói
+  • 🗣️ THOẠI BẮT BUỘC BẰNG TIẾNG VIỆT - Giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
+
+🎭 QUY TẮC XỬ LÝ NHÂN VẬT THOẠI:
+  • Nếu scene chỉ có 1 nhân vật thoại: Nhân vật còn lại phải có biểu cảm lắng nghe chăm chú, gật đầu, mỉm cười, hoặc im lặng quan sát
+  • KHÔNG BAO GIỜ để nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
+  • Nhân vật lắng nghe: Mắt nhìn vào người nói, tư thế chú ý, có thể gật đầu nhẹ hoặc mỉm cười đồng tình
+  • Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
+
+Thời lượng mỗi cảnh: 10 giây
+
+---
+
+Then, for EACH scene in storyboard, analyze dialogue length and generate:
+
+**BƯỚC 1: Phân tích thoại**
+- Đếm số từ trong thoại của cảnh
+- Nếu ≤ 25 từ: Tạo 1 prompt (Scene X)
+- Nếu 26-50 từ: Tạo 2 prompts (Scene X.1, X.2)  
+- Nếu 51-75 từ: Tạo 3 prompts (Scene X.1, X.2, X.3)
+- Nếu > 75 từ: Tạo 4+ prompts tương ứng
+
+**BƯỚC 2: Chia thoại hợp lý**
+- Chia theo câu hoàn chỉnh (không cắt giữa câu)
+- Mỗi đoạn ~20-25 từ (để đủ 8 giây video)
+- Đảm bảo ý nghĩa liên tục giữa các đoạn
+
+**BƯỚC 3: Tạo prompt cho mỗi đoạn**
+
+🎞️ Scene [số].[sub] (nếu có nhiều prompt con, VD: 1.1, 1.2, 1.3)
+
+Mục đích: [Học sinh sẽ hiểu/học được gì - CHỈ GHI Ở PROMPT ĐẦU TIÊN của cảnh]
+
+Mô tả cảnh:
+  - Nhân vật: [Tên - với đặc điểm như đã mô tả trong SETTING CHUNG]
+  - Bối cảnh: [Ở đâu, có gì xung quanh - GIỐNG NHAU cho các prompt con]
+  - Vật dụng: [Sách, bút, hình vẽ, mô hình...]
+  - 🔗 [Nếu là prompt con thứ 2+] Tiếp nối từ Scene [số].[sub-1]
+
+Diễn biến (8 giây):
+  • Giây 0-2: [Nhân vật tiếp tục từ tư thế trước (nếu là prompt con) hoặc bắt đầu mới]
+  • Giây 2-6: [Nói thoại đoạn này - nhân vật giữ nguyên tư thế, chỉ miệng động]
+  • Giây 6-8: [Kết thúc đoạn thoại - chờ prompt tiếp theo HOẶC chuyển cảnh]
+
+Hành động nhân vật: [Mô tả chi tiết cử chỉ, nét mặt, tương tác với vật]
+
+🎭 BIỂU CẢM NHÂN VẬT KHÔNG THOẠI:
+- Nếu có nhân vật không nói trong scene: Mô tả biểu cảm lắng nghe chăm chú
+- Ví dụ: "Nhân vật B ngồi im lặng, mắt nhìn chăm chú vào nhân vật A, gật đầu nhẹ khi hiểu, mỉm cười đồng tình"
+- KHÔNG BAO GIỜ: "Nhân vật B mở miệng như đang nói" hoặc "Nhân vật B có biểu cảm như đang phát biểu"
+- Luôn nhấn mạnh: Nhân vật im lặng = biểu cảm lắng nghe, không phải biểu cảm nói
+
+Góc quay: [Nhìn từ đâu, có di chuyển máy không]
+
+Không khí: [Vui vẻ/tập trung/phấn khởi/...]
+
+Ánh sáng: Giữ sáng tự nhiên từ cửa sổ bên trái như SETTING CHUNG
+
+⚠️ Nhắc nhở: Không có chữ/số hiện trên màn hình. Chỉ dùng hình ảnh và lời nói.
+
+Chuyển cảnh: [Mượt mà sang cảnh tiếp theo như thế nào]
+
+Thoại (🗣️ BẮT BUỘC TIẾNG VIỆT - ~20-25 từ cho prompt này - giọng đọc tự nhiên, rõ ràng):
+  [Tên nhân vật]: "[CHỈ phần thoại cho prompt này - khoảng 20-25 từ - đủ cho 8 giây video]"
   
-  [Character name]:
-    reference_tag: "[CharacterName]_[role]_consistent"
-    
-    age: "[exact age, e.g., 12 years old]"
-    
-    facial_features:
-      face_shape: "[round/oval/square], soft features"
-      eyes: "[color] eyes, [size - large/medium], [expression - bright/gentle]"
-      nose: "[small/medium], button nose"
-      mouth: "[description], [smile type - cheerful/gentle/bright]"
-      skin_tone: "[light/warm/natural] Vietnamese skin tone"
-      distinctive_marks: "[any unique features like dimples, freckles]"
-    
-    hair:
-      style: "[detailed hairstyle - short/long/shoulder-length]"
-      color: "black hair"
-      texture: "[straight/slightly wavy]"
-      details: "[bangs/side-swept/neat/messy]"
-    
-    body:
-      height: "[short/average/tall] for age"
-      build: "[slim/athletic/average]"
-      posture: "[confident/relaxed/curious]"
-    
-    outfit:
-      top: "white school uniform shirt"
-      bottom: "[navy blue pants/skirt]"
-      accessories: "red scarf, [school badge/backpack]"
-      shoes: "[sneakers/school shoes], [color]"
-    
-    personality_expression:
-      default_emotion: "[cheerful/gentle/curious/confident]"
-      energy_level: "[high/moderate/calm]"
-      signature_gesture: "[specific hand gesture or movement]"
-    
-    animation_style: "Pixar-inspired 3D semi-realistic, expressive facial animation, natural movements"
-    
-    render_instruction: "Keep this exact design perfectly consistent in EVERY scene. Same face, same hair, same outfit, same proportions."
+  🎭 NHÂN VẬT KHÔNG THOẠI:
+  - [Tên nhân vật 2]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
+  - [Tên nhân vật 3]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
+  
+💡 VÍ DỤ CHIA THOẠI:
+- Thoại gốc (60 từ): "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa. Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu. Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?"
 
-Environment control:
-  lighting_source: "left-top soft daylight"
-  temperature_kelvin: 5200
-  shadow_direction: "consistent across scenes"
-  color_palette: "warm neutral classroom tones"
-  prop_persistence: true
-  background_consistency: "maintain same classroom layout and decorations"
+- Scene 1.1: 
+  * Vy: "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa." (25 từ)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
 
-Audio continuity:
-  ambient_loop: "classroom_soft_ambience"
-  crossfade_duration: 0.8s
-  maintain_volume_ratio: "speech 0.85 / ambience 0.15"
-  microphone_type: "lapel simulation"
-  background_sounds: "subtle paper rustling, pencil writing, distant classroom"
+- Scene 1.2: 
+  * Vy: "Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu." (21 từ)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
 
-Camera style: Góc quay trung bình (mid-shot) cho thoại, top-view khi mô phỏng hình học. Giữ khung hình ổn định, chuyển động mượt, tránh lia máy nhanh.
+- Scene 1.3: 
+  * Vy: "Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?" (33 từ - có thể chia tiếp nếu cần)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
 
-Animation notes: Mọi hình khối hình học phải chính xác (đáy tròn, chiều cao vuông góc, mặt xung quanh đúng tỷ lệ). 
+⚠️ QUAN TRỌNG: 
+- Toàn bộ thoại phải bằng TIẾNG VIỆT, không dùng tiếng Anh
+- Mỗi prompt chỉ chứa 1 ĐOẠN NGẮN của thoại (20-25 từ)
+- Các prompt con (1.1, 1.2, 1.3) ghép lại = thoại đầy đủ của cảnh gốc
 
-⛔ ABSOLUTE BAN - TEXT/NUMBERS/FORMULAS:
-  • KHÔNG hiển thị: chữ, số, công thức, ký hiệu toán học (e.g., "2/3 - (1/2 + 1/3)", "=", "+", "×", "√")
-  • LÝ DO: AI video generators (Veo 3, Sora 2, Runway Gen-3, Pika 2.0) LUÔN LUÔN render sai công thức và số
-  • VÍ DỤ SAI: Viết "2/3 - (1/2 + 1/3)" lên bảng → AI tạo ra "2/5 - (1/3 + 1/2)" hoặc ký hiệu lộn xộn
-  • GIẢI PHÁP: 
-    - Nhân vật NÓI: "hai phần ba trừ một nửa cộng một phần ba"
-    - Nhân vật CHỈ TAY vào bảng trống hoặc vật thể trực quan (thanh phân số, hình khối màu)
-    - Sử dụng biểu diễn TRỰC QUAN: thanh phân số bằng hình chữ nhật chia đoạn, đếm bằng ngón tay/vật thể
-  • CHỈ ĐƯỢC: Hình ảnh trực quan + lời thoại + hành động cử chỉ
-
-Duration default: 10s mỗi cảnh
-Aspect: 16:9
-FPS: 24
-Voice tone: Giọng học thuật tiếng Việt, chậm rãi, rõ ràng (~0.85x).
-
-Focus priority:
-  - Tính chính xác hình học
-  - Cử chỉ tự nhiên của nhân vật
-  - Tính mạch lạc giữa các cảnh
-
-Render control: Không text, không ký hiệu, không label — chỉ hành động, vật thể, ánh sáng.
-
-Timeline metadata:
-  series_id: "[Generate unique ID from storyboard title]"
-  total_scenes: [Number of scenes]
-  continuity_mode: "strict"
+🎭 LƯU Ý VỀ NHÂN VẬT THOẠI:
+- Chỉ nhân vật được chỉ định mới có thoại trong prompt này
+- Nhân vật còn lại: Biểu cảm lắng nghe chăm chú TRONG TẤT CẢ các prompt con
+- Giữ nguyên tư thế, biểu cảm lắng nghe xuyên suốt các prompt con của cùng 1 cảnh
+- BẮT BUỘC ghi rõ trong phần "NHÂN VẬT KHÔNG THOẠI" để AI hiểu rõ ai không nói
+- Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
 
 ---
 
-Then, for EACH scene, generate:
+**YÊU CẦU QUAN TRỌNG:**
 
-🎞️ PROMPT – Scene [number]
+1. Format output: Text thường với tiêu đề emoji (🧱 🎞️), KHÔNG dùng JSON
 
-Goal: [Scene purpose - what should be learned/shown]
+2. SETTING CHUNG viết 1 lần duy nhất ở đầu
 
-Scene description: [Overall context - characters present (use FULL character descriptions from Character consistency control), setting, objects visible, layout]
+3. ⚠️ BẮT BUỘC: Phải xử lý TẤT CẢ các cảnh trong storyboard
+   - VD: Storyboard có 12 cảnh → Phải xử lý đủ 12 cảnh
+   - Mỗi cảnh CÓ THỂ tạo nhiều prompt con nếu thoại dài
+   - VD: Cảnh 1 (60 từ) → Scene 1.1, 1.2, 1.3
+   - VD: Cảnh 2 (20 từ) → Scene 2 (chỉ 1 prompt)
+   - TỔNG SỐ PROMPT có thể > số cảnh gốc (do chia nhỏ)
+   - KHÔNG được dừng giữa chừng!
 
-Characters in scene: [List each character with reference to their consistency control - e.g., "Nam (reference: Nam_student_consistent - 12-year-old boy, short black hair, brown eyes, bright smile, white uniform, navy pants)"]
+3b. 📊 QUY TẮC CHIA CẢNH THÀNH PROMPT:
+   - Đọc thoại của cảnh trong storyboard
+   - Đếm số từ trong thoại
+   - Nếu ≤ 25 từ: 1 prompt (Scene X)
+   - Nếu 26-50 từ: 2 prompts (Scene X.1, X.2)
+   - Nếu 51-75 từ: 3 prompts (Scene X.1, X.2, X.3)
+   - Nếu > 75 từ: 4+ prompts
+   - Chia thoại theo câu hoàn chỉnh, mỗi đoạn ~20-25 từ
+   - Các prompt con giữ nguyên hình ảnh, chỉ khác thoại
 
-Beat plan:
-  0–3s: [Opening action - what happens in first 3 seconds]
-  3–7s: [Main action - core content of scene]
-  7–10s: [Closing/transition action - how scene ends]
+4. Ngôn ngữ & Thoại:
+   - Tất cả nội dung bằng TIẾNG VIỆT
+   - Thoại: 🗣️ BẮT BUỘC TIẾNG VIỆT - giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
+   - Không dùng tiếng Anh trong thoại
+   - Giải thích chi tiết, dễ hiểu${enableDialogueSeconds && Number(dialogueSeconds) > 0 ? `\n   - ⏱️ QUAN TRỌNG: Viết thoại đủ dài để đọc trong ${Number(dialogueSeconds)} giây (khoảng ${Math.floor(Number(dialogueSeconds) * 2.5)}-${Math.floor(Number(dialogueSeconds) * 3)} từ tiếng Việt)` : ''}
 
-Camera: [Camera angles and movements for this scene]
+5. 🎭 XỬ LÝ NHÂN VẬT THOẠI:
+   - Nếu scene có 2+ nhân vật nhưng chỉ 1 người nói: Nhân vật còn lại PHẢI có biểu cảm lắng nghe
+   - Biểu cảm lắng nghe: Mắt nhìn chăm chú, gật đầu, mỉm cười, tư thế chú ý
+   - TUYỆT ĐỐI KHÔNG: Nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
+   - Mục đích: Tránh lỗi AI render nhầm thoại cho nhân vật sai
 
-Animation / Action: [Detailed description of character movements, object interactions, gestures]
+6. Mô tả nhân vật phải chi tiết:
+   - Tuổi, khuôn mặt (tròn/oval/vuông)
+   - Mắt (màu, to/nhỏ), mũi, miệng (nụ cười)
+   - Tóc (kiểu, màu, dài/ngắn)
+   - Trang phục cụ thể (áo trắng, quần xanh, khăn đỏ)
+   → Đủ chi tiết để AI vẽ giống hệt nhau ở MỌI cảnh
 
-Emotion: [Atmosphere and emotional tone of the scene]
+7. Giữ nhất quán:
+   - Nhân vật: Khuôn mặt, tóc, trang phục GIỐNG HỆT mọi cảnh
+   - Bối cảnh: Lớp học, bàn ghế, ánh sáng GIỐNG NHAU
+   - Âm thanh: Không đổi
 
-Overlay (nếu có): [Optional visual indicators like arrows, light effects, highlights - leave blank if none]
+8. ⛔ TUYỆT ĐỐI KHÔNG có chữ/số/công thức trên màn hình:
+   - Lý do: AI video không vẽ đúng chữ số
+   - Giải pháp: Dùng vật thể hình ảnh + nhân vật nói
 
-Geometry mode: [2D or 3D as appropriate for content]
-
-Lighting: [Maintain consistency with SETTING CHUNG - left-top soft daylight, 5200K, consistent shadows]
-
-Render control: 
-  ⛔ ABSOLUTE BAN: Không text, không số, không công thức, không ký hiệu toán học
-  ✅ CHỈ ĐƯỢC: Vật thể trực quan + hành động + cử chỉ nhân vật + lời thoại
-  • VÍ DỤ: Thay vì viết "2/3" → dùng thanh phân số (hình chữ nhật chia 3 phần, tô 2 phần)
-  • VÍ DỤ: Thay vì viết "5 + 3 = 8" → nhân vật đếm 5 ngón tay, thêm 3 ngón, nói "tám"
-
-Character consistency check: [Verify all characters match their reference_tag descriptions from SETTING CHUNG]
-
-Transition to next: [How this scene transitions to the next - smooth cut, fade, match action, etc]
-
-Continuity:
-  timeline_id: "[same series_id from SETTING CHUNG]"
-  scene_number: [current scene number]
-  previous_scene: "Scene_[number-1]" (or "None" if first scene)
-  next_scene: "Scene_[number+1]" (or "End" if last scene)
-  transition_type: "[soft cut / match action / fade / dissolve]"
-  maintain_from_previous: "[List key elements to keep: character positions, lighting angle, prop placement]"
-
-TTS Script:
-  [Character name]: "[Dialogue line in Vietnamese]"
-  [Character name]: "[Dialogue line in Vietnamese]"
-
----
-
-**CRITICAL RULES:**
-1. Output as formatted TEXT with emoji headers, NOT JSON
-2. Generate SETTING CHUNG only ONCE at the beginning
-3. ⚠️ **MUST GENERATE PROMPTS FOR ALL SCENES** - If storyboard has 12 scenes, output MUST contain 12 complete 🎞️ PROMPT blocks. DO NOT stop early!
-4. Generate one 🎞️ PROMPT block for EACH scene (complete ALL scenes in the storyboard)
-5. Keep Vietnamese language natural and educational
-5. All dialogue in TTS Script must be in Vietnamese
-6. No English in output except section labels
-7. **CHARACTER CONSISTENCY (CRITICAL)**: 
-   - Create DETAILED physical descriptions for each character in Character consistency control
-   - Include: exact age, face shape, eye color/size, nose, mouth, skin tone, hair style/color/texture
-   - Describe body height/build, outfit details, accessories
-   - Add personality expression and signature gestures
-   - Must be detailed enough for AI to recreate EXACT same character in every scene
-   - Example level of detail: "12-year-old boy, round face, large brown eyes, button nose, bright cheerful smile, light Vietnamese skin tone, short black straight hair neatly combed, average height slim build, white uniform shirt, navy pants, red scarf, sneakers, cheerful energy, confident posture"
-8. MAINTAIN STRICT CHARACTER VISUAL CONSISTENCY: Each character MUST appear IDENTICAL in ALL scenes - same face, same hair, same outfit, same proportions
-9. MAINTAIN ENVIRONMENT CONSISTENCY: Same lighting (left-top, 5200K), same classroom layout, same props across ALL scenes
-10. MAINTAIN AUDIO CONSISTENCY: Same ambient sounds, same volume ratios throughout
-11. Each scene exactly 10 seconds
-12. ⛔ ABSOLUTE BAN - NO TEXT/NUMBERS/FORMULAS VISIBLE IN VIDEO:
-    - NO mathematical expressions (e.g., "2/3 - (1/2 + 1/3)", "x + y = z")
-    - NO numbers written anywhere (e.g., "3", "15", "0.5")
-    - NO text labels, subtitles, or captions
-    - REASON: AI video generators (Veo 3, Sora 2, Runway Gen-3, Pika 2.0) ALWAYS render text/math INCORRECTLY
-    - EXAMPLE WRONG: Show "2/3 - (1/2 + 1/3)" written on board → AI renders with wrong symbols/numbers
-    - EXAMPLE CORRECT: Character says "hai phần ba trừ một nửa cộng một phần ba" while pointing at empty board OR showing visual fraction bars
-    - ALL math content MUST be delivered through DIALOGUE and VISUAL ACTIONS only (fraction bars, shapes, counting with objects)
-13. Focus on geometric accuracy for math/science content - use VISUAL representations, NOT written text
-14. Use Continuity metadata in EVERY scene to link timeline
-15. When describing characters in scenes, ALWAYS reference their full consistency control description from SETTING CHUNG
-16. Transition types must be smooth and maintain visual continuity
-17. **Pixar-inspired 3D style**: Semi-realistic, expressive facial animation, soft shadows, pastel color palette, natural movements`;
+9. Phong cách: Video 3D Pixar - mềm mại, biểu cảm, màu sắc ấm${dialogueDurationNote}`;
 
         const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
 
@@ -1995,15 +2071,21 @@ ipcMain.handle('validate-veo3-cookie', async (event, { cookieString }) => {
             await pages[0].close(); // Close blank page
         }
 
-        // Set cookies before navigation
+        // Set cookies before navigation - one by one
         console.log('[Validate] Đang set cookies...');
+        let setCookieCount = 0;
+
         for (const cookie of cookies) {
             try {
                 await page.setCookie(cookie);
+                setCookieCount++;
+                console.log(`[Validate] ✓ Set cookie: ${cookie.name}`);
             } catch (err) {
-                console.log(`[Validate] Skip cookie ${cookie.name}: ${err.message}`);
+                console.log(`[Validate] ✗ Failed to set cookie ${cookie.name}: ${err.message}`);
             }
         }
+
+        console.log(`[Validate] Set ${setCookieCount}/${cookies.length} cookies successfully`);
 
         // Navigate to Flow page
         console.log('[Validate] Đang mở trang Flow...');
@@ -2304,10 +2386,22 @@ ipcMain.handle('validate-veo3-cookie', async (event, { cookieString }) => {
 ipcMain.on('stop-veo3-automation', () => {
     console.log('Received stop Veo3 automation signal');
     stopFlowAutomation = true;
+
+    // Send immediate stop confirmation to UI
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(window => {
+        if (window && !window.isDestroyed()) {
+            window.webContents.send('veo3:log', {
+                promptId: null,
+                message: '🛑 Đã nhận lệnh dừng - đang dừng tất cả tiến trình...',
+                status: 'error'
+            });
+        }
+    });
 });
 
 // Start Veo3 automation
-ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, autoSaveConfig }) => {
+ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, videoConfig, autoSaveConfig }) => {
     const mainWindow = BrowserWindow.fromWebContents(event.sender);
     if (!mainWindow) return;
 
@@ -2316,28 +2410,100 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, a
 
     // Log helper function
     const logMessage = (promptId, message, status, videoUrl = null) => {
+        const logData = {
+            promptId,
+            message,
+            status, // 'running' | 'processing' | 'success' | 'error'
+            videoUrl
+        };
+
         if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('veo3:log', {
-                promptId,
-                message,
-                status, // 'running' | 'processing' | 'success' | 'error'
-                videoUrl
-            });
+            mainWindow.webContents.send('veo3:log', logData);
+            console.log(`[Veo3 Backend] Sent log to frontend:`, JSON.stringify(logData));
+        } else {
+            console.log(`[Veo3 Backend] ⚠️ Cannot send log - mainWindow destroyed or not found`);
         }
+
         console.log(`[Veo3 ${promptId || 'general'}] ${message}`);
     };
 
     try {
         logMessage(null, 'Đang khởi động Veo3 automation...', 'running');
 
-        // Parse cookies
-        const cookies = parseCookieForPuppeteer(cookieString);
+        // Log video configuration
+        logMessage(null, `Cấu hình: Model=${videoConfig?.model || 'veo3-fast'}, Aspect=${videoConfig?.aspectRatio || '16:9'}, Output=${videoConfig?.outputCount || 1}`, 'running');
+
+        // Parse cookies - USE SAME LOGIC AS VALIDATION (NOT parseCookieForPuppeteer!)
+        logMessage(null, 'Đang parse cookies...', 'running');
+        const cookies = [];
+        const trimmedString = cookieString.trim();
+
+        // Check format: semicolon = document.cookie, tab = DevTools TSV
+        if (trimmedString.includes(';') && !trimmedString.includes('\t')) {
+            // Format 1: document.cookie format (name=value; name2=value2)
+            console.log('[Veo3] Detected document.cookie format');
+            const pairs = trimmedString.split(';');
+
+            for (const pair of pairs) {
+                const [name, ...valueParts] = pair.trim().split('=');
+                if (name && valueParts.length > 0) {
+                    const value = valueParts.join('=');
+                    const trimmedName = name.trim();
+
+                    // Determine domain based on cookie name
+                    let domain = '.google.com';
+                    if (trimmedName.includes('next-auth') || trimmedName === 'EMAIL' || trimmedName.startsWith('_ga')) {
+                        domain = 'labs.google';
+                    }
+
+                    cookies.push({
+                        name: trimmedName,
+                        value: value.trim(),
+                        domain: domain,
+                        path: '/',
+                        secure: true,
+                        httpOnly: false,
+                        sameSite: 'Lax'
+                    });
+                }
+            }
+        } else {
+            // Format 2: DevTools TSV format
+            console.log('[Veo3] Detected DevTools TSV format');
+            const lines = trimmedString.split('\n');
+
+            for (const line of lines) {
+                const parts = line.trim().split('\t');
+                if (parts.length >= 7) {
+                    const cookie = {
+                        name: parts[5],
+                        value: parts[6],
+                        domain: parts[0],
+                        path: parts[2],
+                        secure: parts[3] === 'TRUE' || parts[3] === '✓',
+                        httpOnly: parts[4] === 'TRUE' || parts[4] === '✓',
+                        sameSite: 'None'
+                    };
+
+                    if (parts[1] && parts[1] !== '0') {
+                        cookie.expires = parseInt(parts[1]);
+                    }
+
+                    cookies.push(cookie);
+                }
+            }
+        }
+
         logMessage(null, `Đã parse ${cookies.length} cookies`, 'running');
+
+        if (cookies.length === 0) {
+            throw new Error('Không tìm thấy cookie hợp lệ! Vui lòng kiểm tra lại cookie string.');
+        }
 
         // Import Puppeteer
         const puppeteer = require('puppeteer-core');
 
-        // Launch browser
+        // Launch browser (SAME AS VALIDATION)
         logMessage(null, 'Đang khởi động Chromium...', 'running');
         const browser = await puppeteer.launch({
             headless: false,
@@ -2345,64 +2511,722 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, a
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process'
-            ]
+                '--disable-blink-features=AutomationControlled',
+                '--start-maximized'
+            ],
+            ignoreDefaultArgs: ['--enable-automation'],
+            defaultViewport: null
         });
 
         const page = await browser.newPage();
-        await page.setViewport({ width: 1920, height: 1080 });
 
-        // Set cookies
+        // Set cookies BEFORE navigation (SAME AS VALIDATION)
         logMessage(null, 'Đang set cookies...', 'running');
-        await page.setCookie(...cookies);
 
-        // Navigate to Veo3
-        logMessage(null, 'Đang truy cập Google Veo 3...', 'running');
-        await page.goto('https://labs.google/fx/vi/tools/veo', {
+        let setCookieCount = 0;
+
+        for (const cookie of cookies) {
+            try {
+                await page.setCookie(cookie);
+                setCookieCount++;
+                console.log(`[Veo3] ✓ Set cookie: ${cookie.name}`);
+            } catch (err) {
+                console.log(`[Veo3] ✗ Failed to set cookie ${cookie.name}: ${err.message}`);
+            }
+        }
+
+        console.log(`[Veo3] Set ${setCookieCount}/${cookies.length} cookies successfully`);
+
+        if (setCookieCount === 0) {
+            await browser.close();
+            throw new Error('Không thể set bất kỳ cookie nào! Vui lòng kiểm tra lại cookie string.');
+        }
+
+        // Navigate to FLOW with cookies (SAME AS SETTINGS)
+        logMessage(null, 'Đang truy cập Google Flow với cookies...', 'running');
+        await page.goto('https://labs.google/fx/vi/tools/flow', {
             waitUntil: 'networkidle2',
             timeout: 60000
         });
 
-        logMessage(null, 'Đã tải trang Veo 3 thành công', 'running');
+        logMessage(null, 'Đã tải trang Flow thành công', 'running');
 
-        // Wait for textarea
-        await page.waitForSelector('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', {
-            visible: true,
-            timeout: 30000
-        });
+        // Wait for page to fully render (SAME AS SETTINGS)
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-        logMessage(null, `Bắt đầu xử lý ${prompts.length} prompts`, 'running');
+        // Close popup if exists (SAME AS SETTINGS)
+        logMessage(null, 'Đang đóng popup nếu có...', 'running');
+        try {
+            // Press ESC 3 times
+            for (let i = 0; i < 3; i++) {
+                await page.keyboard.press('Escape');
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            console.log('[Veo3] Đã nhấn ESC 3 lần');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Click X button
+            await page.mouse.click(598, 209);
+            console.log('[Veo3] Đã click vào vị trí nút X');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (err) {
+            console.log('[Veo3] Lỗi khi đóng popup:', err.message);
+        }
+
+        logMessage(null, `🚀 Sẵn sàng xử lý ${prompts.length} prompts`, 'running');
+
+        // Fixed textarea selector (from Flow UI)
+        const textareaSelector = 'textarea#PINHOLE_TEXT_AREA_ELEMENT_ID';
 
         // Process each prompt
         for (let i = 0; i < prompts.length && !stopFlowAutomation; i++) {
             const prompt = prompts[i];
             logMessage(prompt.id, `[${i + 1}/${prompts.length}] Đang xử lý prompt`, 'processing');
 
+            // Check stop flag before each prompt
+            if (stopFlowAutomation) {
+                logMessage(null, '🛑 Đã nhận lệnh dừng - dừng xử lý prompts', 'error');
+                break;
+            }
+
+            // QUEUE CONTROL: From scene 2 onwards, optionally wait for previous scene's frame file
+            if (i > 0 && !stopFlowAutomation) {
+                try {
+                    const useExtractedFrames = !!(videoConfig && videoConfig.useExtractedFrames);
+                    if (!useExtractedFrames) {
+                        console.log(`[Veo3 Queue] Skipping frame wait (useExtractedFrames = false)`);
+                    }
+
+                    if (!useExtractedFrames) {
+                        // Skip waiting entirely
+                        // Proceed without extracted frame
+                    } else {
+                        // SIMPLE & ROBUST: Just wait for the immediately previous prompt in the array
+                        // This works for both normal scenes (1, 2, 3) and sub-scenes (1.1, 1.2, 2.1)
+                        const prevPrompt = prompts[i - 1];
+                        const prevSceneIndex = prevPrompt?.originalIndex || (i - 1);
+
+                        console.log(`[Veo3 Queue] Current scene: ${prompt.originalIndex}, waiting for previous scene: ${prevSceneIndex}`);
+
+                        const frameDir = autoSaveConfig && autoSaveConfig.path ? autoSaveConfig.path : null;
+                        const pollIntervalMs = 5000; // 5s
+
+                        if (frameDir && fs.existsSync(frameDir)) {
+                            let detectedPath = null;
+                            logMessage(prompt.id, `⏳ [QUEUE] Đang chờ scene ${prevSceneIndex} hoàn thành và lưu khung hình...`, 'processing');
+
+                            // Poll indefinitely until frame is found or user stops
+                            while (!stopFlowAutomation) {
+                                try {
+                                    const allFiles = fs.readdirSync(frameDir);
+                                    const jpgFiles = allFiles.filter(name => name.toLowerCase().endsWith('.jpg'));
+                                    const searchPattern = `frame_scene_scene-${prevSceneIndex}_`;
+                                    const matchedFiles = jpgFiles.filter(name => name.includes(searchPattern));
+
+                                    console.log(`[Veo3 Debug] Looking for scene ${prevSceneIndex} frame:`);
+                                    console.log(`[Veo3 Debug] - Frame directory: ${frameDir}`);
+                                    console.log(`[Veo3 Debug] - Search pattern: ${searchPattern}`);
+                                    console.log(`[Veo3 Debug] - Total files in dir: ${allFiles.length}`);
+                                    console.log(`[Veo3 Debug] - JPG files found: ${jpgFiles.length}`);
+                                    console.log(`[Veo3 Debug] - Matched files: ${matchedFiles.length}`);
+                                    if (jpgFiles.length > 0) {
+                                        console.log(`[Veo3 Debug] - Sample JPG files:`, jpgFiles.slice(0, 5));
+                                    }
+
+                                    if (matchedFiles.length > 0) {
+                                        // Pick latest by mtime
+                                        const latest = matchedFiles
+                                            .map(name => ({ name, mtime: fs.statSync(path.join(frameDir, name)).mtime.getTime() }))
+                                            .sort((a, b) => b.mtime - a.mtime)[0];
+                                        detectedPath = path.join(frameDir, latest.name);
+
+                                        if (detectedPath && fs.existsSync(detectedPath)) {
+                                            prompt.extractedFrame = detectedPath;
+                                            logMessage(prompt.id, `✅ [QUEUE] Đã phát hiện khung hình từ scene ${prevSceneIndex}: ${path.basename(detectedPath)}`, 'processing');
+                                            break; // Frame found, exit wait loop
+                                        }
+                                    }
+                                } catch (pollErr) {
+                                    console.log(`[Veo3] Poll error (will retry): ${pollErr.message}`);
+                                }
+
+                                // Wait 5s before next poll
+                                await new Promise(r => setTimeout(r, pollIntervalMs));
+
+                                // Log waiting status every 30s
+                                const elapsed = Math.floor((Date.now() - (prompt._queueStartTime || Date.now())) / 1000);
+                                if (elapsed > 0 && elapsed % 30 === 0) {
+                                    logMessage(prompt.id, `⏳ [QUEUE] Vẫn đang chờ scene ${prevSceneIndex}... (đã chờ ${Math.floor(elapsed / 60)} phút)`, 'processing');
+                                }
+
+                                if (!prompt._queueStartTime) {
+                                    prompt._queueStartTime = Date.now();
+                                }
+                            }
+
+                            // If stopped while waiting
+                            if (stopFlowAutomation) {
+                                logMessage(prompt.id, `🛑 [QUEUE] Đã dừng trong khi chờ scene ${prevSceneIndex}`, 'error');
+                                break;
+                            }
+                        }
+                    }
+                } catch (waitErr) {
+                    console.log('[Veo3] Queue wait error:', waitErr.message);
+                    logMessage(prompt.id, `⚠️ [QUEUE] Lỗi khi chờ: ${waitErr.message}`, 'processing');
+                }
+            }
+
+            if (prompt.extractedFrame && fs.existsSync(prompt.extractedFrame) && videoConfig && videoConfig.useExtractedFrames) {
+                logMessage(prompt.id, `🖼️ Dang tai len tu khung hinh scene truoc: ${path.basename(prompt.extractedFrame)}`, 'processing');
+
+                try {
+                    // 4.5.1: Click "Từ văn bản sang video" combobox to open dropdown
+                    logMessage(prompt.id, 'Dang mo menu "Tu van ban sang video"...', 'processing');
+                    await page.evaluate(() => {
+                        const normalize = (s) => (s || '')
+                            .normalize('NFD')
+                            .replace(/[\u0300-\u036f]/g, '')
+                            .toLowerCase();
+
+                        // Prefer role combobox, but fallback to the first combobox if text match fails
+                        const comboboxes = Array.from(document.querySelectorAll('button[role="combobox"], [role="combobox"]'));
+                        let target = comboboxes.find(btn => normalize(btn.textContent).includes('tu van ban sang video'));
+                        if (!target) target = comboboxes.find(btn => normalize(btn.textContent).includes('text to video'));
+
+                        if (!target && comboboxes.length > 0) {
+                            // Fallback: click the first combobox (Flow typically has the source combobox visible)
+                            target = comboboxes[0];
+                            console.log('[Veo3] Fallback: clicking first combobox');
+                        }
+
+                        if (target && typeof target.click === 'function') {
+                            target.scrollIntoView({ block: 'center', inline: 'center' });
+                            target.click();
+                            console.log('[Veo3] Clicked "Tu van ban sang video" button');
+                            return true;
+                        }
+                        console.log('[Veo3] Could not find any combobox to open source menu');
+                        return false;
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // 4.5.2: Select "Tạo video từ các khung hình" option
+                    logMessage(prompt.id, 'Dang chon "Tao video tu cac khung hinh"...', 'processing');
+                    await page.evaluate(() => {
+                        const normalize = (s) => (s || '')
+                            .normalize('NFD')
+                            .replace(/[\u0300-\u036f]/g, '')
+                            .toLowerCase();
+
+                        // Collect menu options broadly
+                        const options = Array.from(document.querySelectorAll('[role="option"], [role="menuitem"], [data-radix-collection-item], button, li'));
+
+                        let target = options.find(el => normalize(el.textContent).includes('tao video tu cac khung hinh'));
+                        if (!target) target = options.find(el => normalize(el.textContent).includes('create video from frames'));
+                        if (!target) target = options.find(el => normalize(el.textContent).includes('frames'));
+
+                        if (target && typeof target.click === 'function') {
+                            target.scrollIntoView({ block: 'center', inline: 'center' });
+                            target.click();
+                            console.log('[Veo3] Selected "Tao video tu cac khung hinh"');
+                            return true;
+                        }
+                        console.log('[Veo3] Could not find frames option in menu');
+                        return false;
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    // 4.5.3: Click "+" (add) button
+                    logMessage(prompt.id, 'Dang click nut "+" de them khung hinh...', 'processing');
+                    await page.evaluate(() => {
+                        const button = document.evaluate('/html/body/div[1]/div[2]/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/div/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        if (button) {
+                            button.click();
+                            console.log('[Veo3] Clicked "+" add button via XPath');
+                            return true;
+                        } else {
+                            console.log('[Veo3] Không tìm thấy phần tử với XPath!');
+                            return false;
+                        }
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+
+
+                    // 4.5.4: Click "Tải lên" (upload) button
+                    // logMessage(prompt.id, 'Đang click nút "Tải lên"...', 'processing');
+                    // await page.evaluate(() => {
+                    //     const buttons = Array.from(document.querySelectorAll('button'));
+                    //     const uploadButton = buttons.find(btn => {
+                    //         const icon = btn.querySelector('i.google-symbols');
+                    //         return icon && icon.textContent === 'upload';
+                    //     });
+                    //     if (uploadButton) {
+                    //         uploadButton.click();
+                    //         console.log('[Veo3] Clicked "Tải lên" upload button');
+                    //         return true;
+                    //     }
+                    //     return false;
+                    // });
+                    // //Đóng cửa sổ chọn File vừa hiện lên
+                    // await page.evaluate(() => {
+                    //     const windowFileChooser = document.querySelector('window.file-chooser');
+                    //     if (windowFileChooser) {
+                    //         windowFileChooser.close();
+                    //     }
+                    // });
+                    // await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // 4.5.5: Click "Tôi đồng ý" in dialog if it appears
+                    logMessage(prompt.id, 'Dang click "Toi dong y"...', 'processing');
+                    try {
+                        await page.evaluate(() => {
+                            const buttons = Array.from(document.querySelectorAll('button'));
+                            const agreeButton = buttons.find(btn =>
+                                btn.textContent.includes('Toi dong y')
+                            );
+                            if (agreeButton) {
+                                agreeButton.click();
+                                console.log('[Veo3] Clicked "Toi dong y" button');
+                                return true;
+                            }
+                            return false;
+                        });
+                    } catch (err) {
+                        console.log('[Veo3] No "Toi dong y" dialog found, continuing...');
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // 4.5.6: Upload the frame file using input[type=file] or file chooser
+                    logMessage(prompt.id, `Dang tai len file: ${path.basename(prompt.extractedFrame)}...`, 'processing');
+
+                    // Prefer setInputFiles on a visible input[type=file]
+                    let uploaded = false;
+                    try {
+                        // Wait up to 7s for an input[type=file] to exist
+                        await page.waitForSelector('input[type="file"]', { timeout: 7000 });
+                        const inputs = await page.$$('input[type="file"]');
+                        if (inputs && inputs.length > 0) {
+                            // Use the first input (Flow UI usually mounts one in the upload area)
+                            await inputs[0].uploadFile(prompt.extractedFrame);
+                            uploaded = true;
+                            console.log('[Veo3] File uploaded via setInputFiles');
+                            logMessage(prompt.id, '✅ Đã tải lên bằng input file (setInputFiles)', 'processing');
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    } catch (_) { /* ignore and fallback */ }
+
+
+
+                    // 4.5.7: Click "Cắt và lưu" button
+                    logMessage(prompt.id, 'Đang click "Cắt và lưu"...', 'processing');
+                    await page.evaluate(() => {
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const cropButton = buttons.find(btn => {
+                            const icon = btn.querySelector('i.material-icons');
+                            const text = btn.textContent;
+                            return icon && icon.textContent === 'crop' && text.includes('Cắt và lưu');
+                        });
+                        if (cropButton) {
+                            cropButton.click();
+                            console.log('[Veo3] Clicked "Cắt và lưu" button');
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    // 4.5.8: Wait 10 seconds for processing
+                    logMessage(prompt.id, 'Đang đợi xử lý khung hình (10 giây)...', 'processing');
+                    await new Promise(resolve => setTimeout(resolve, 10000));
+
+                    logMessage(prompt.id, '✅ Đã tải lên và xử lý khung hình thành công', 'processing');
+
+                } catch (uploadError) {
+                    console.error('[Veo3] ❌ Lỗi khi tải lên khung hình:', uploadError);
+                    logMessage(prompt.id, `⚠️ Không thể tải lên khung hình: ${uploadError.message}`, 'processing');
+                    // Continue with text-only prompt
+                }
+            } else if (prompt.extractedFrame) {
+                console.log('[Veo3] ⚠️ Extracted frame file not found:', prompt.extractedFrame);
+                logMessage(prompt.id, '⚠️ File khung hình không tồn tại, tiếp tục với text-only', 'processing');
+            }
+
             try {
-                // Clear textarea
-                await page.waitForSelector('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', { visible: true, timeout: 10000 });
-                await page.click('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', { clickCount: 3 });
+                // STEP 1: Click "+ Dự án mới" ONLY for FIRST prompt (all prompts are in ONE project)
+                if (i === 0) {
+                    logMessage(prompt.id, 'Đang nhấp nút "+ Dự án mới"...', 'processing');
+
+                    // Try to find and click the button
+                    const newProjectButtonClicked = await page.evaluate(() => {
+                        // Try multiple ways to find the button
+                        const buttons = Array.from(document.querySelectorAll('button'));
+
+                        // Method 1: Find by text content
+                        let targetButton = buttons.find(btn => btn.textContent.includes('Dự án mới'));
+
+                        // Method 2: Find by icon (add_2)
+                        if (!targetButton) {
+                            targetButton = buttons.find(btn => {
+                                const icon = btn.querySelector('i.google-symbols');
+                                return icon && icon.textContent === 'add_2';
+                            });
+                        }
+
+                        if (targetButton) {
+                            targetButton.click();
+                            console.log('[Veo3] Clicked "+ Dự án mới" button');
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    if (newProjectButtonClicked) {
+                        console.log('[Veo3] ✓ Đã nhấp nút "+ Dự án mới"');
+                    } else {
+                        console.log('[Veo3] ⚠ Không tìm thấy nút "+ Dự án mới", có thể đã ở giao diện tạo project');
+                    }
+
+                    // STEP 2: Wait 5s for UI to load (only for first prompt)
+                    logMessage(prompt.id, 'Đợi giao diện tải (5 giây)...', 'processing');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } else {
+                    // For subsequent prompts, just log that we're continuing in the same project
+                    logMessage(prompt.id, `[${i + 1}/${prompts.length}] Tiếp tục trong cùng dự án...`, 'processing');
+                    // Wait a bit for previous video to finish downloading
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+
+                // Check stop flag after waiting
+                if (stopFlowAutomation) {
+                    logMessage(prompt.id, '🛑 Đã nhận lệnh dừng - bỏ qua prompt này', 'error');
+                    continue;
+                }
+
+                // STEP 3: Configure video settings FIRST (before entering prompt)
+                if (videoConfig) {
+                    logMessage(prompt.id, 'Đang cấu hình video trước khi submit...', 'processing');
+
+                    // 4.1: Click settings button (tune icon) to open configuration menu
+                    try {
+                        logMessage(prompt.id, 'Đang click vào nút cài đặt (tune icon)...', 'processing');
+                        await page.evaluate(() => {
+                            // Find settings button with tune icon
+                            const buttons = Array.from(document.querySelectorAll('button'));
+                            const settingsButton = buttons.find(btn => {
+                                const icon = btn.querySelector('i.material-icons-outlined');
+                                return icon && icon.textContent === 'tune';
+                            });
+                            if (settingsButton) {
+                                settingsButton.click();
+                                console.log('[Veo3] Clicked settings button with tune icon');
+                                return true;
+                            }
+                            return false;
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } catch (err) {
+                        console.log(`[Veo3] ⚠ Không thể click settings button: ${err.message}`);
+                    }
+
+                    // 4.2: Select aspect ratio (ALWAYS click, even for default 16:9)
+                    try {
+                        logMessage(prompt.id, `Đang chọn tỷ lệ khung hình ${videoConfig?.aspectRatio || '16:9'}...`, 'processing');
+                        await page.evaluate((aspectRatio) => {
+                            // Find aspect ratio dropdown with specific selectors
+                            const buttons = Array.from(document.querySelectorAll('button[role="combobox"]'));
+                            const aspectButton = buttons.find(btn => {
+                                const span = btn.querySelector('span');
+                                return span && span.textContent.includes('Tỷ lệ khung hình');
+                            });
+                            if (aspectButton) {
+                                aspectButton.click();
+                                setTimeout(() => {
+                                    // Find target aspect ratio option
+                                    const options = Array.from(document.querySelectorAll('[role="option"], [role="menuitem"]'));
+                                    let targetOption;
+
+                                    if (aspectRatio === '9:16') {
+                                        targetOption = options.find(opt =>
+                                            opt.textContent.includes('9:16') || opt.textContent.includes('Khổ dọc')
+                                        );
+                                    } else {
+                                        // Default to 16:9 (Khổ ngang)
+                                        targetOption = options.find(opt =>
+                                            opt.textContent.includes('16:9') || opt.textContent.includes('Khổ ngang')
+                                        );
+                                    }
+
+                                    if (targetOption) {
+                                        targetOption.click();
+                                        console.log(`[Veo3] Selected aspect ratio: ${aspectRatio || '16:9'}`);
+                                    }
+                                }, 500);
+                            }
+                        }, videoConfig?.aspectRatio || '16:9');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    } catch (err) {
+                        console.log(`[Veo3] ⚠ Không thể chọn aspect ratio: ${err.message}`);
+                    }
+
+                    // 4.3: Select output count (ALWAYS click, even for default 1)
+                    try {
+                        logMessage(prompt.id, `Đang chọn số lượng ${videoConfig?.outputCount || 1} video...`, 'processing');
+                        await page.evaluate((count) => {
+                            // Find output count dropdown with specific selectors
+                            const buttons = Array.from(document.querySelectorAll('button[role="combobox"]'));
+                            const countButton = buttons.find(btn => {
+                                const span = btn.querySelector('span');
+                                return span && span.textContent.includes('Câu trả lời đầu ra cho mỗi câu lệnh');
+                            });
+                            if (countButton) {
+                                countButton.click();
+                                setTimeout(() => {
+                                    // Find target count option
+                                    const options = Array.from(document.querySelectorAll('[role="option"], [role="menuitem"]'));
+                                    const targetOption = options.find(opt =>
+                                        opt.textContent.includes(count.toString())
+                                    );
+                                    if (targetOption) {
+                                        targetOption.click();
+                                        console.log(`[Veo3] Selected output count: ${count}`);
+                                    }
+                                }, 500);
+                            }
+                        }, videoConfig?.outputCount || 1);
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    } catch (err) {
+                        console.log(`[Veo3] ⚠ Không thể chọn output count: ${err.message}`);
+                    }
+
+                    // 4.4: Select model (ALWAYS click, even for default veo3-fast)
+                    try {
+                        logMessage(prompt.id, `Đang chọn mô hình ${videoConfig?.model || 'veo3-fast'}...`, 'processing');
+                        await page.evaluate((model) => {
+                            // Model mapping
+                            const modelMap = {
+                                'veo3-fast': 'Veo 3.1 - Fast',
+                                'veo3-quality': 'Veo 3 - Quality',
+                                'veo2-fast': 'Veo 2 - Fast',
+                                'veo2-quality': 'Veo 2 - Quality'
+                            };
+                            const targetModelText = modelMap[model] || 'Veo 3.1 - Fast';
+
+                            // Find model dropdown with specific selectors
+                            const buttons = Array.from(document.querySelectorAll('button[role="combobox"]'));
+                            const modelButton = buttons.find(btn => {
+                                const span = btn.querySelector('span');
+                                return span && span.textContent.includes('Mô hình');
+                            });
+                            if (modelButton) {
+                                modelButton.click();
+                                setTimeout(() => {
+                                    // Find target model option
+                                    const options = Array.from(document.querySelectorAll('[role="option"], [role="menuitem"]'));
+                                    const targetOption = options.find(opt =>
+                                        opt.textContent.includes(targetModelText)
+                                    );
+                                    if (targetOption) {
+                                        targetOption.click();
+                                        console.log(`[Veo3] Selected model: ${targetModelText}`);
+                                    }
+                                }, 500);
+                            }
+                        }, videoConfig?.model || 'veo3-fast');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    } catch (err) {
+                        console.log(`[Veo3] ⚠ Không thể chọn model: ${err.message}`);
+                    }
+                }
+
+
+
+                //Lặp lại ở bước này
+
+                // STEP 4: Wait and fill textarea AFTER configuration (and after selecting frames mode if any)
+                logMessage(prompt.id, 'Đang tìm textarea để nhập prompt...', 'processing');
+                await page.waitForSelector(textareaSelector, { visible: true, timeout: 30000 });
+
+                // Clear textarea completely
+                await page.click(textareaSelector, { clickCount: 3 });
                 await page.keyboard.press('Backspace');
+                await new Promise(resolve => setTimeout(resolve, 500)); // Wait for clear
 
-                // Type prompt
-                logMessage(prompt.id, 'Đang nhập prompt...', 'processing');
-                await page.type('textarea#PINHOLE_TEXT_AREA_ELEMENT_ID', prompt.text, { delay: 30 });
+                // Type prompt character by character (NO PASTE)
+                // IMPORTANT: Replace all newlines with spaces to prevent accidental submit
+                const promptTextSingleLine = prompt.text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-                // Submit
+                logMessage(prompt.id, `Đang typing prompt (${promptTextSingleLine.length} ký tự)...`, 'processing');
+                console.log(`[Veo3] Starting to type ${promptTextSingleLine.length} characters...`);
+                console.log(`[Veo3] Original length: ${prompt.text.length}, Single-line length: ${promptTextSingleLine.length}`);
+
+                // Type with delay between characters to simulate human typing
+                const typingDelay = 10; // 10ms per character
+                await page.type(textareaSelector, promptTextSingleLine, { delay: typingDelay });
+
+                // Wait for typing to complete
+                const expectedTypingTime = promptTextSingleLine.length * typingDelay;
+                console.log(`[Veo3] Expected typing time: ${expectedTypingTime}ms`);
+                await new Promise(resolve => setTimeout(resolve, Math.max(1000, expectedTypingTime / 10)));
+
+                // Verify content was typed completely - CRITICAL CHECK
+                logMessage(prompt.id, 'Đang kiểm tra nội dung đã nhập đầy đủ...', 'processing');
+
+                let verificationAttempts = 0;
+                let typedContent = '';
+                const maxVerificationAttempts = 5;
+
+                while (verificationAttempts < maxVerificationAttempts) {
+                    typedContent = await page.evaluate((selector) => {
+                        const textarea = document.querySelector(selector);
+                        return textarea ? textarea.value : '';
+                    }, textareaSelector);
+
+                    console.log(`[Veo3] Verification attempt ${verificationAttempts + 1}:`);
+                    console.log(`[Veo3] - Expected length: ${promptTextSingleLine.length}`);
+                    console.log(`[Veo3] - Actual length: ${typedContent.length}`);
+                    console.log(`[Veo3] - Match percentage: ${(typedContent.length / promptTextSingleLine.length * 100).toFixed(2)}%`);
+
+                    // Check if content matches (allow 95% match to account for minor differences)
+                    if (typedContent.length >= promptTextSingleLine.length * 0.95) {
+                        console.log(`[Veo3] ✓ Content verification PASSED`);
+                        break;
+                    }
+
+                    console.log(`[Veo3] ⚠ Content incomplete, waiting 1 second...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    verificationAttempts++;
+                }
+
+                // Final strict verification before submit
+                if (typedContent.length < promptTextSingleLine.length * 0.95) {
+                    const errorMsg = `Content verification FAILED! Expected ${promptTextSingleLine.length} chars, got ${typedContent.length} chars (${(typedContent.length / promptTextSingleLine.length * 100).toFixed(2)}%)`;
+                    console.error(`[Veo3] ❌ ${errorMsg}`);
+                    throw new Error(errorMsg);
+                }
+
+                if (!typedContent || typedContent.length < 50) {
+                    throw new Error(`Textarea content is too short (${typedContent.length} chars). Minimum required: 50 chars`);
+                }
+
+                console.log(`[Veo3] ✓ Final content verified: ${typedContent.length}/${promptTextSingleLine.length} characters (${(typedContent.length / promptTextSingleLine.length * 100).toFixed(2)}%)`);
+                logMessage(prompt.id, `✓ Đã nhập đầy đủ ${typedContent.length} ký tự`, 'processing');
+
+                // STEP 5: Capture ALL existing media URLs BEFORE submit (to ensure we wait for a truly NEW one)
+                const existingMediaUrls = await page.evaluate(() => {
+                    const urls = new Set();
+                    // Collect existing video sources
+                    document.querySelectorAll('video[controlslist="nodownload"]').forEach(v => {
+                        if (v.src && !v.src.startsWith('data:')) urls.add(v.src);
+                    });
+                    // Collect any direct download/storage links
+                    document.querySelectorAll('a[href*="storage.googleapis.com"]').forEach(a => {
+                        if (a.href) urls.add(a.href);
+                    });
+                    return Array.from(urls);
+                }).catch(() => []);
+
+                console.log('[Veo3] Existing media URLs before submit:', existingMediaUrls);
+
+                // STEP 5b: Submit after configuration (and frame upload if applicable)
                 logMessage(prompt.id, 'Đang submit prompt...', 'processing');
                 await page.keyboard.press('Enter');
 
-                // Wait for video generation (max 5 minutes)
-                logMessage(prompt.id, 'Đang chờ video được tạo (tối đa 5 phút)...', 'processing');
+                // Wait for video generation (NO TIMEOUT - wait until video appears or user stops)
+                logMessage(prompt.id, 'Đang chờ video được tạo (chờ đến khi có video)...', 'processing');
 
-                try {
-                    await page.waitForFunction(() => {
+                // Monitor progress with periodic updates
+                let progressCheckInterval;
+                let videoGenerated = false;
+                const videoGenStartTime = Date.now();
+
+                // Start progress monitoring
+                progressCheckInterval = setInterval(async () => {
+                    if (videoGenerated || stopFlowAutomation) return;
+
+                    try {
+                        const progressInfo = await page.evaluate(() => {
+                            // Check for progress indicators
+                            const progressElements = document.querySelectorAll('[data-testid*="progress"], .progress, [class*="progress"]');
+                            const statusElements = document.querySelectorAll('[class*="status"], [class*="loading"]');
+
+                            let progressText = '';
+                            let statusText = '';
+
+                            // Get progress text
+                            progressElements.forEach(el => {
+                                const text = el.textContent?.trim();
+                                if (text && text.length > 0 && text.length < 100) {
+                                    progressText = text;
+                                }
+                            });
+
+                            // Get status text
+                            statusElements.forEach(el => {
+                                const text = el.textContent?.trim();
+                                if (text && text.length > 0 && text.length < 100) {
+                                    statusText = text;
+                                }
+                            });
+
+                            return {
+                                progressText: progressText || 'Đang xử lý...',
+                                statusText: statusText || 'Đang tạo video',
+                                hasVideo: !!document.querySelector('video[controlslist="nodownload"]')
+                            };
+                        });
+
+                        // Log elapsed time every minute
+                        const elapsedMinutes = Math.floor((Date.now() - videoGenStartTime) / 60000);
+                        const statusMsg = `${progressInfo.progressText} - ${progressInfo.statusText} (${elapsedMinutes} phút)`;
+
+                        if (progressInfo.hasVideo) {
+                            videoGenerated = true;
+                            clearInterval(progressCheckInterval);
+                        } else {
+                            // Send progress update
+                            logMessage(prompt.id, statusMsg, 'processing');
+                        }
+                    } catch (err) {
+                        // Ignore progress check errors
+                    }
+                }, 10000); // Check every 10 seconds
+
+                // Wait for video indefinitely (poll every 2s until video appears or user stops)
+                while (!stopFlowAutomation) {
+                    const hasNewVideo = await page.evaluate((oldUrls) => {
                         const video = document.querySelector('video[controlslist="nodownload"]');
-                        return video && video.src && !video.src.startsWith('data:') && video.src.includes('storage.googleapis.com');
-                    }, { timeout: 300000 }); // 5 minutes
-                } catch (timeoutError) {
-                    throw new Error('Timeout: Video không được tạo sau 5 phút');
+                        if (!video || !video.src || video.src.startsWith('data:')) return false;
+
+                        // Check if it's a storage URL
+                        if (!video.src.includes('storage.googleapis.com')) return false;
+
+                        // Ensure the new URL is NOT among any previously seen URLs
+                        const previouslySeen = Array.isArray(oldUrls) ? new Set(oldUrls) : new Set();
+                        if (previouslySeen.has(video.src)) return false;
+
+                        console.log('[Veo3] NEW video detected!', video.src);
+                        return true;
+                    }, existingMediaUrls).catch(() => false);
+
+                    if (hasNewVideo) {
+                        videoGenerated = true;
+                        break; // Video found, exit wait loop
+                    }
+
+                    // Wait 2s before next check
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+
+                // Clear interval when done
+                if (progressCheckInterval) {
+                    clearInterval(progressCheckInterval);
+                }
+
+                // If stopped while waiting for video
+                if (stopFlowAutomation) {
+                    logMessage(prompt.id, '🛑 Đã dừng trong khi chờ video được tạo', 'error');
+                    throw new Error('Stopped by user');
                 }
 
                 // Extract video URL
@@ -2420,25 +3244,72 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, a
                     throw new Error('Không tìm thấy URL video hợp lệ');
                 }
 
+                // Verify it's a NEW video
+                console.log('[Veo3] Previously seen media URLs:', existingMediaUrls);
+                console.log('[Veo3] New video URL:', videoUrl);
+                if (existingMediaUrls && existingMediaUrls.includes(videoUrl)) {
+                    console.warn('[Veo3] ⚠️ WARNING: New video URL is among previously seen URLs!');
+                }
+
                 logMessage(prompt.id, 'Đã tạo video thành công!', 'success', videoUrl);
                 processedCount++;
 
-                // Auto download if enabled
-                if (autoSaveConfig.enabled && autoSaveConfig.path && typeof prompt.originalIndex === 'number') {
-                    logMessage(prompt.id, 'Đang tải video...', 'processing');
+                // Auto download if enabled - CRITICAL: Must complete before next scene starts
+                console.log(`[Veo3] Auto-save config:`, {
+                    enabled: autoSaveConfig.enabled,
+                    hasPath: !!autoSaveConfig.path,
+                    originalIndex: prompt.originalIndex,
+                    indexType: typeof prompt.originalIndex
+                });
+
+                // FIXED: Accept both number and string (for sub-scenes like "1.1")
+                if (autoSaveConfig.enabled && autoSaveConfig.path && prompt.originalIndex != null) {
                     const downloadResult = await downloadVideoFromUrl(videoUrl, prompt.text, autoSaveConfig.path, prompt.originalIndex);
 
                     if (!downloadResult.success) {
                         logMessage(prompt.id, `Lỗi khi lưu: ${downloadResult.error}`, 'error', videoUrl);
                     } else {
-                        logMessage(prompt.id, `Đã lưu tại: ${downloadResult.path}`, 'success', videoUrl);
+                        // Send success with LOCAL video path for UI to display (not overwrite previous success)
+                        // UI will use this local path to show video player
+                        logMessage(prompt.id, `✅ Đã lưu tại: ${downloadResult.path}`, 'success', downloadResult.path);
+
+                        // CRITICAL: Wait for frame extraction to complete before proceeding
+                        // Frontend will auto-capture frame after receiving success log
+                        // Wait 3 seconds to ensure frame capture completes (frontend has 500ms delay + processing time)
+                        console.log(`[Veo3] Waiting 3s for frame extraction...`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+
+                        // Verify frame was saved
+                        const frameDir = autoSaveConfig.path;
+                        const sceneIndex = prompt.originalIndex;
+                        const frameFiles = fs.readdirSync(frameDir)
+                            .filter(name => name.toLowerCase().endsWith('.jpg'))
+                            .filter(name => name.includes(`frame_scene_scene-${sceneIndex}_`));
+
+                        if (frameFiles.length > 0) {
+                            const latestFrame = frameFiles
+                                .map(name => ({ name, mtime: fs.statSync(path.join(frameDir, name)).mtime.getTime() }))
+                                .sort((a, b) => b.mtime - a.mtime)[0];
+                            const framePath = path.join(frameDir, latestFrame.name);
+                            console.log(`[Veo3] ✅ Frame saved: ${path.basename(framePath)}`);
+                            // Don't send log to avoid overwriting UI status
+                        } else {
+                            console.log(`[Veo3] ⚠️ Frame not detected yet (next scene will wait)`);
+                            // Don't send log to avoid overwriting UI status
+                        }
                     }
                 }
 
-                // Delay between prompts
+                // Reload page for next scene
+                console.log(`[Veo3] Reloading page for next scene...`);
+                await page.reload({ waitUntil: 'networkidle0' });
+                // Wait for UI to stabilize
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+                // Small delay between prompts (scene tiếp theo sẽ tự động chờ nếu cần frame)
                 if (i < prompts.length - 1 && !stopFlowAutomation) {
-                    logMessage(null, 'Chờ 5 giây trước khi xử lý prompt tiếp theo...', 'running');
-                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    logMessage(null, `✅ Scene ${prompt.originalIndex} hoàn thành. Chuẩn bị scene tiếp theo...`, 'running');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
 
             } catch (error) {
@@ -2467,6 +3338,143 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, a
             detail: error.stack
         });
 
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+// Test Veo3 Account - Open browser with cookies (for debugging)
+ipcMain.handle('test-veo3-account', async (event, { cookieString, accountName }) => {
+    const puppeteer = require('puppeteer-core');
+
+    try {
+        console.log(`[Test Account] =====================================`);
+        console.log(`[Test Account] TESTING: ${accountName}`);
+        console.log(`[Test Account] =====================================`);
+
+        // Parse cookies - USE SAME LOGIC AS VALIDATION
+        const cookies = [];
+        const trimmedString = cookieString.trim();
+
+        // Check format: semicolon = document.cookie, tab = DevTools TSV
+        if (trimmedString.includes(';') && !trimmedString.includes('\t')) {
+            // Format 1: document.cookie format (name=value; name2=value2)
+            console.log('[Test Account] Detected document.cookie format');
+            const pairs = trimmedString.split(';');
+
+            for (const pair of pairs) {
+                const [name, ...valueParts] = pair.trim().split('=');
+                if (name && valueParts.length > 0) {
+                    const value = valueParts.join('=');
+                    const trimmedName = name.trim();
+
+                    // Determine domain based on cookie name
+                    let domain = '.google.com';
+                    if (trimmedName.includes('next-auth') || trimmedName === 'EMAIL' || trimmedName.startsWith('_ga')) {
+                        domain = 'labs.google';
+                    }
+
+                    cookies.push({
+                        name: trimmedName,
+                        value: value.trim(),
+                        domain: domain,
+                        path: '/',
+                        secure: true,
+                        httpOnly: false,
+                        sameSite: 'Lax'
+                    });
+                }
+            }
+        } else {
+            // Format 2: DevTools TSV format
+            console.log('[Test Account] Detected DevTools TSV format');
+            const lines = trimmedString.split('\n');
+
+            for (const line of lines) {
+                const parts = line.trim().split('\t');
+                if (parts.length >= 7) {
+                    const cookie = {
+                        name: parts[5],
+                        value: parts[6],
+                        domain: parts[0],
+                        path: parts[2],
+                        secure: parts[3] === 'TRUE' || parts[3] === '✓',
+                        httpOnly: parts[4] === 'TRUE' || parts[4] === '✓',
+                        sameSite: 'None'
+                    };
+
+                    if (parts[1] && parts[1] !== '0') {
+                        cookie.expires = parseInt(parts[1]);
+                    }
+
+                    cookies.push(cookie);
+                }
+            }
+        }
+
+        console.log(`[Test Account] Parsed ${cookies.length} cookies`);
+
+        if (cookies.length === 0) {
+            return {
+                success: false,
+                error: 'Không tìm thấy cookie hợp lệ!'
+            };
+        }
+
+        // Launch browser (SAME AS VALIDATION)
+        const browser = await puppeteer.launch({
+            headless: false,
+            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--start-maximized'
+            ],
+            ignoreDefaultArgs: ['--enable-automation'],
+            defaultViewport: null
+        });
+
+        const page = await browser.newPage();
+
+        // Set cookies BEFORE navigation (SAME AS VALIDATION)
+        console.log('[Test Account] Setting cookies...');
+        let setCookieCount = 0;
+
+        for (const cookie of cookies) {
+            try {
+                await page.setCookie(cookie);
+                setCookieCount++;
+                console.log(`[Test Account] ✓ Set cookie: ${cookie.name}`);
+            } catch (err) {
+                console.log(`[Test Account] ✗ Failed to set cookie ${cookie.name}: ${err.message}`);
+            }
+        }
+
+        console.log(`[Test Account] Set ${setCookieCount}/${cookies.length} cookies successfully`);
+
+        // Navigate to Flow (SAME AS VALIDATION)
+        console.log('[Test Account] Navigating to Flow...');
+        await page.goto('https://labs.google/fx/vi/tools/flow', {
+            waitUntil: 'networkidle2',
+            timeout: 60000
+        });
+
+        console.log('[Test Account] ✅ Page loaded successfully!');
+        console.log('[Test Account] Browser will stay open - check login status manually');
+        console.log('[Test Account] Close browser when done');
+
+        // Don't close browser - let user inspect manually
+
+        return {
+            success: true,
+            message: `Browser đã mở với ${setCookieCount}/${cookies.length} cookies. Kiểm tra trạng thái đăng nhập!`
+        };
+
+    } catch (error) {
+        console.error('[Test Account] Error:', error);
         return {
             success: false,
             error: error.message
