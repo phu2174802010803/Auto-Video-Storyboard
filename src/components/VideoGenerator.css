@@ -1399,3 +1399,151 @@
         width: 100%;
     }
 }
+
+/* Video Merging Styles */
+.merge-progress {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.merge-progress .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.merge-progress .progress-header span:first-child {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.merge-progress .progress-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.merge-progress-bar {
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    height: 8px;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.merge-status {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.merged-video-result {
+    background: var(--bg-secondary);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.merged-video-result .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.merged-video-result .result-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+}
+
+.success-badge {
+    background: #4CAF50;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.merged-video-info {
+    margin-bottom: 16px;
+}
+
+.video-path {
+    background: var(--bg-tertiary);
+    padding: 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 12px 0;
+    word-break: break-all;
+}
+
+.merged-video-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.merged-video-actions .btn-view-video {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.merged-video-actions .btn-view-video:hover {
+    background: #1976D2;
+}
+
+.merged-video-actions .btn-copy-url {
+    background: #FF9800;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.merged-video-actions .btn-copy-url:hover {
+    background: #F57C00;
+}
+
+@media (max-width: 768px) {
+    .merged-video-actions {
+        flex-direction: column;
+    }
+
+    .merged-video-actions .btn-view-video,
+    .merged-video-actions .btn-copy-url {
+        width: 100%;
+        text-align: center;
+    }
+}

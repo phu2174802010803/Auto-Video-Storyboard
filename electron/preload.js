@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('veo3:log', subscription);
     },
 
+    // Video Merging
+    mergeVideos: (params) => ipcRenderer.invoke('merge-videos', params),
+
     // Generic event listener (for validation-progress, etc.)
     on: (channel, callback) => {
         const subscription = (event, data) => callback(data);

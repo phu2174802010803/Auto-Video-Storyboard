@@ -34,11 +34,11 @@ export const STORY_STYLES = [
 
 // Word count presets
 export const VIDEO_DURATION_PRESETS = [
-    { label: '⚡ 1 phút (~60s)', value: '1', words: 500 },
-    { label: '🎬 2 phút (~120s)', value: '2', words: 1000 },
-    { label: '📹 3 phút (~180s)', value: '3', words: 1500 },
-    { label: '🎞️ 5 phút (~300s)', value: '5', words: 2500 },
-    { label: '📺 10 phút (~600s)', value: '10', words: 5000 }
+    { label: '⚡ Ngắn (500 từ)', value: '500', words: 500 },
+    { label: '🎬 Trung bình (1000 từ)', value: '1000', words: 1000 },
+    { label: '📹 Dài (1500 từ)', value: '1500', words: 1500 },
+    { label: '🎞️ Rất dài (2500 từ)', value: '2500', words: 2500 },
+    { label: '📺 Siêu dài (5000 từ)', value: '5000', words: 5000 }
 ];
 
 // Backward compatibility

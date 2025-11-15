@@ -16,6 +16,8 @@ const PromptGenerator = () => {
     const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
     const [progress, setProgress] = useState(0);
     const [progressStatus, setProgressStatus] = useState('');
+    const [isEditingPrompts, setIsEditingPrompts] = useState(false);
+    const [editedPrompts, setEditedPrompts] = useState('');
 
     // Dialogue duration controls
     const [enableDialogueSeconds, setEnableDialogueSeconds] = useState(false);
@@ -292,6 +294,23 @@ const PromptGenerator = () => {
         // Character image feature removed - will be implemented with Whisk AI later
     };
 
+    // Prompt editing functions
+    const handleStartEditPrompts = () => {
+        setEditedPrompts(videoPrompts);
+        setIsEditingPrompts(true);
+    };
+
+    const handleSaveEditedPrompts = () => {
+        setVideoPrompts(editedPrompts);
+        setIsEditingPrompts(false);
+        success('Đã lưu prompt video đã chỉnh sửa!');
+    };
+
+    const handleCancelEditPrompts = () => {
+        setEditedPrompts('');
+        setIsEditingPrompts(false);
+    };
+
     return (
         <div className="prompt-generator">
             <div className="page-header">
@@ -440,49 +459,81 @@ const PromptGenerator = () => {
                         return (
                             <div className="prompts-display">
                                 <div className="prompts-actions">
-                                    <button onClick={handleCopyAllPrompts} className="btn-secondary">
-                                        📋 Copy Toàn Bộ
-                                    </button>
-                                    <button onClick={handleExportPrompts} className="btn-secondary">
-                                        💾 Xuất File
-                                    </button>
+                                    {!isEditingPrompts ? (
+                                        <>
+                                            <button onClick={handleCopyAllPrompts} className="btn-secondary">
+                                                📋 Copy Toàn Bộ
+                                            </button>
+                                            <button onClick={handleExportPrompts} className="btn-secondary">
+                                                💾 Xuất File
+                                            </button>
+                                            <button onClick={handleStartEditPrompts} className="btn-edit">
+                                                ✏️ Chỉnh sửa
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={handleSaveEditedPrompts} className="btn-success">
+                                                ✅ Lưu chỉnh sửa
+                                            </button>
+                                            <button onClick={handleCancelEditPrompts} className="btn-secondary">
+                                                ❌ Hủy
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
-                                {/* SETTING CHUNG Section */}
-                                {settingChung && (
-                                    <div className="prompt-section">
-                                        <div className="section-header">
-                                            <h3 className="section-title">🧱 SETTING CHUNG</h3>
-                                            <button
-                                                onClick={() => handleCopySection(settingChung, 'Setting Chung')}
-                                                className="btn-copy-section"
-                                            >
-                                                📋 Copy
-                                            </button>
-                                        </div>
-                                        <div className="section-content">
-                                            <pre>{settingChung}</pre>
-                                        </div>
+                                {/* Prompt Editor */}
+                                {isEditingPrompts ? (
+                                    <div className="prompt-editor-section">
+                                        <h3>✏️ Chỉnh sửa Prompt Video</h3>
+                                        <textarea
+                                            value={editedPrompts}
+                                            onChange={(e) => setEditedPrompts(e.target.value)}
+                                            className="prompt-editor"
+                                            placeholder="Chỉnh sửa prompt video tại đây..."
+                                            rows={25}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {/* SETTING CHUNG Section */}
+                                        {settingChung && (
+                                            <div className="prompt-section">
+                                                <div className="section-header">
+                                                    <h3 className="section-title">🧱 SETTING CHUNG</h3>
+                                                    <button
+                                                        onClick={() => handleCopySection(settingChung, 'Setting Chung')}
+                                                        className="btn-copy-section"
+                                                    >
+                                                        📋 Copy
+                                                    </button>
+                                                </div>
+                                                <div className="section-content">
+                                                    <pre>{settingChung}</pre>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Scene Sections */}
+                                        {scenes.map((scene, index) => (
+                                            <div key={index} className="prompt-section scene-section">
+                                                <div className="section-header">
+                                                    <h3 className="section-title">🎞️ Scene {index + 1}</h3>
+                                                    <button
+                                                        onClick={() => handleCopySection(settingChung + '\n\n---\n\n' + scene, `Scene ${index + 1} + Setting`)}
+                                                        className="btn-copy-section"
+                                                    >
+                                                        📋 Copy Scene + Setting
+                                                    </button>
+                                                </div>
+                                                <div className="section-content">
+                                                    <pre>{scene}</pre>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
-
-                                {/* Scene Sections */}
-                                {scenes.map((scene, index) => (
-                                    <div key={index} className="prompt-section scene-section">
-                                        <div className="section-header">
-                                            <h3 className="section-title">🎞️ Scene {index + 1}</h3>
-                                            <button
-                                                onClick={() => handleCopySection(settingChung + '\n\n---\n\n' + scene, `Scene ${index + 1} + Setting`)}
-                                                className="btn-copy-section"
-                                            >
-                                                📋 Copy Scene + Setting
-                                            </button>
-                                        </div>
-                                        <div className="section-content">
-                                            <pre>{scene}</pre>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         );
                     })()}

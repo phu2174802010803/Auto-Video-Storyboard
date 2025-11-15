@@ -31,6 +31,13 @@ const VideoGenerator = () => {
     const [logs, setLogs] = useState([]);
     const [shouldSaveHistory, setShouldSaveHistory] = useState(false); // Flag to trigger history save
 
+    // Video merging states
+    const [isMerging, setIsMerging] = useState(false);
+    const [mergeProgress, setMergeProgress] = useState({ current: 0, total: 0 });
+    const [mergedVideoUrl, setMergedVideoUrl] = useState(null);
+    const [mergeLogs, setMergeLogs] = useState([]);
+    const [hasMerged, setHasMerged] = useState(false); // Flag to prevent multiple merges
+
     // Frame extraction for scene continuity
     const [extractedFrames, setExtractedFrames] = useState({}); // Store extracted frames for each prompt
 
@@ -39,7 +46,8 @@ const VideoGenerator = () => {
         aspectRatio: '16:9', // 16:9 or 9:16
         model: 'veo3-fast', // veo3-fast, veo3-quality, veo2-fast, veo2-quality
         outputCount: 1, // Number of videos per prompt
-        useExtractedFrames: true // Use extracted frames for continuity
+        useExtractedFrames: true, // Use extracted frames for continuity
+        autoMergeVideos: true // Auto-merge all videos into one complete video
     });
 
     // Calculate credits based on configuration
@@ -122,6 +130,22 @@ const VideoGenerator = () => {
         }
     }, [shouldSaveHistory, isRunning, videoProgress, logs, selectedPromptId, promptHistory, veo3Accounts, selectedAccountId, prompts, selectedPrompts, extractedFrames]);
 
+    // Auto-merge videos when all scenes are completed
+    useEffect(() => {
+        if (!isRunning && !isMerging && !hasMerged && videoConfig.autoMergeVideos) {
+            const totalVideos = prompts.filter(p => p.type === 'scene' && selectedPrompts.has(p.id)).length;
+            const successfulVideos = Object.values(videoProgress).filter(p => p.status === 'success').length;
+
+            // Check if all videos are completed
+            if (totalVideos > 0 && successfulVideos === totalVideos) {
+                console.log('[VideoGenerator] All videos completed, starting auto-merge...');
+                setTimeout(() => {
+                    autoMergeVideos();
+                }, 2000); // Wait 2 seconds for all processes to complete
+            }
+        }
+    }, [isRunning, videoProgress, prompts, selectedPrompts, videoConfig.autoMergeVideos, isMerging, hasMerged]);
+
     // Load veo3 accounts when component mounts
     useEffect(() => {
         const saved = localStorage.getItem('veo3-accounts');
@@ -135,13 +159,13 @@ const VideoGenerator = () => {
     }, []);
 
     // Parse prompts from prompt history content
-    // Each scene will include SETTING CHUNG + Scene content
+    // Extract SETTING CHUNG separately and create scene-only prompts
     const parsePromptsFromContent = (content) => {
         if (!content) return [];
 
         const lines = content.split('\n');
         const prompts = [];
-        let settingChung = ''; // Store SETTING CHUNG to prepend to each scene
+        let settingChung = ''; // Store SETTING CHUNG separately
         let currentSection = '';
         let currentContent = [];
         let sceneIndex = 0;
@@ -155,18 +179,20 @@ const VideoGenerator = () => {
                 if (currentSection === 'scene' && currentContent.length > 0) {
                     sceneIndex++;
                     const sceneContent = currentContent.join('\n').trim();
-                    // Combine SETTING CHUNG + Scene
-                    const fullPrompt = settingChung
-                        ? `${settingChung}\n\n---\n\n${sceneContent}`
-                        : sceneContent;
+
+                    // Extract scene number from content (support 1, 1.1, 1.2 format)
+                    const sceneNumberMatch = currentContent[0].match(/Scene\s*([\d.]+)/i);
+                    const sceneNumber = sceneNumberMatch ? sceneNumberMatch[1] : sceneIndex.toString();
 
                     prompts.push({
-                        id: `scene-${sceneIndex}`,
+                        id: `scene-${sceneNumber}`,
                         type: 'scene',
-                        title: `Scene ${sceneIndex}`,
-                        text: fullPrompt,
-                        sceneOnly: sceneContent, // Keep scene-only text for display
-                        originalIndex: sceneIndex
+                        title: `Scene ${sceneNumber}`,
+                        text: sceneContent, // Only scene content, no SETTING CHUNG
+                        sceneOnly: sceneContent,
+                        originalIndex: sceneNumber,
+                        sceneNumber: sceneNumber,
+                        isFirstScene: sceneIndex === 1 // Mark first scene
                     });
                 }
 
@@ -188,9 +214,6 @@ const VideoGenerator = () => {
                 else if (currentSection === 'scene' && currentContent.length > 0) {
                     sceneIndex++;
                     const sceneContent = currentContent.join('\n').trim();
-                    const fullPrompt = settingChung
-                        ? `${settingChung}\n\n---\n\n${sceneContent}`
-                        : sceneContent;
 
                     // Extract scene number from content (support 1, 1.1, 1.2 format)
                     const sceneNumberMatch = currentContent[0].match(/Scene\s*([\d.]+)/i);
@@ -200,10 +223,11 @@ const VideoGenerator = () => {
                         id: `scene-${sceneNumber}`,
                         type: 'scene',
                         title: `Scene ${sceneNumber}`,
-                        text: fullPrompt,
+                        text: sceneContent, // Only scene content, no SETTING CHUNG
                         sceneOnly: sceneContent,
-                        originalIndex: sceneNumber,  // FIXED: Use sceneNumber (1.1, 1.2) instead of sceneIndex (1, 2, 3)
-                        sceneNumber: sceneNumber  // Add scene number for display (1.1, 1.2, etc.)
+                        originalIndex: sceneNumber,
+                        sceneNumber: sceneNumber,
+                        isFirstScene: sceneIndex === 1 // Mark first scene
                     });
                 }
 
@@ -222,9 +246,6 @@ const VideoGenerator = () => {
         } else if (currentSection === 'scene' && currentContent.length > 0) {
             sceneIndex++;
             const sceneContent = currentContent.join('\n').trim();
-            const fullPrompt = settingChung
-                ? `${settingChung}\n\n---\n\n${sceneContent}`
-                : sceneContent;
 
             // Extract scene number from content (support 1, 1.1, 1.2 format)
             const sceneNumberMatch = currentContent[0].match(/Scene\s*([\d.]+)/i);
@@ -234,14 +255,21 @@ const VideoGenerator = () => {
                 id: `scene-${sceneNumber}`,
                 type: 'scene',
                 title: `Scene ${sceneNumber}`,
-                text: fullPrompt,
+                text: sceneContent, // Only scene content, no SETTING CHUNG
                 sceneOnly: sceneContent,
-                originalIndex: sceneNumber,  // FIXED: Use sceneNumber (1.1, 1.2) instead of sceneIndex (1, 2, 3)
-                sceneNumber: sceneNumber  // Add scene number for display (1.1, 1.2, etc.)
+                originalIndex: sceneNumber,
+                sceneNumber: sceneNumber,
+                isFirstScene: sceneIndex === 1 // Mark first scene
             });
         }
 
-        console.log('[VideoGenerator] Parsed prompts with SETTING:', prompts);
+        // Store SETTING CHUNG globally for first scene
+        if (settingChung) {
+            prompts.settingChung = settingChung;
+        }
+
+        console.log('[VideoGenerator] Parsed prompts (scene-only):', prompts);
+        console.log('[VideoGenerator] SETTING CHUNG length:', settingChung.length);
         return prompts;
     };
 
@@ -386,19 +414,55 @@ const VideoGenerator = () => {
         }
     };
 
-    // Handle folder selection
-    const handleSelectFolder = async () => {
+    // Auto-merge videos when all scenes are completed
+    const autoMergeVideos = async () => {
+        if (!videoConfig.autoMergeVideos || hasMerged || isMerging) {
+            console.log('[VideoGenerator] Merge skipped - autoMergeVideos:', videoConfig.autoMergeVideos, 'hasMerged:', hasMerged, 'isMerging:', isMerging);
+            return;
+        }
+
         try {
-            const result = await window.electronAPI.selectDownloadDirectory();
-            if (result && result.success && result.path) {
-                setSavePath(result.path);
-                success('Đã chọn thư mục lưu video!');
+            // Get all successful video URLs
+            const successfulVideos = Object.values(videoProgress)
+                .filter(progress => progress.status === 'success' && progress.videoUrl)
+                .map(progress => progress.videoUrl)
+                .filter(url => url && !url.startsWith('http')); // Only local MP4 files
+
+            if (successfulVideos.length < 2) {
+                console.log('[VideoGenerator] Not enough videos to merge:', successfulVideos.length);
+                return;
+            }
+
+            console.log('[VideoGenerator] Starting auto-merge of', successfulVideos.length, 'videos');
+            setHasMerged(true); // Set flag to prevent multiple merges
+            setIsMerging(true);
+            setMergeProgress({ current: 0, total: successfulVideos.length });
+            setMergeLogs([]);
+
+            const result = await window.electronAPI.mergeVideos({
+                videoPaths: successfulVideos,
+                outputPath: savePath,
+                outputFileName: `merged_video_${Date.now()}.mp4`
+            });
+
+            if (result.success) {
+                setMergedVideoUrl(result.outputPath);
+                success(`Đã ghép thành công ${successfulVideos.length} video thành 1 video hoàn chỉnh!`);
+                console.log('[VideoGenerator] ✅ Video merge completed:', result.outputPath);
+            } else {
+                showError(`Lỗi khi ghép video: ${result.error}`);
+                console.error('[VideoGenerator] ❌ Video merge failed:', result.error);
+                setHasMerged(false); // Reset flag on error to allow retry
             }
         } catch (error) {
-            console.error('Error selecting folder:', error);
-            showError('Lỗi khi chọn thư mục!');
+            console.error('[VideoGenerator] ❌ Error in auto-merge:', error);
+            showError(`Lỗi khi ghép video: ${error.message}`);
+            setHasMerged(false); // Reset flag on error to allow retry
+        } finally {
+            setIsMerging(false);
         }
     };
+
 
     // Set default save folder
     const handleSetDefaultFolder = async () => {
@@ -407,11 +471,11 @@ const VideoGenerator = () => {
             if (result && result.success && result.path) {
                 setSavePath(result.path);
                 localStorage.setItem('veo3-default-save-path', result.path);
-                success('Đã set thư mục mặc định!');
+                success('Đã chọn thư mục lưu video & frame và set làm mặc định!');
             }
         } catch (error) {
             console.error('Error setting default folder:', error);
-            showError('Lỗi khi set thư mục mặc định!');
+            showError('Lỗi khi chọn thư mục!');
         }
     };
 
@@ -421,7 +485,7 @@ const VideoGenerator = () => {
             if (savePath) {
                 await window.electronAPI.openFile(savePath);
             } else {
-                warning('Chưa chọn thư mục lưu video!');
+                warning('Chưa chọn thư mục lưu video & frame!');
             }
         } catch (error) {
             console.error('Error opening folder:', error);
@@ -518,7 +582,7 @@ const VideoGenerator = () => {
         }
 
         if (!savePath) {
-            warning('Vui lòng chọn thư mục lưu video trước khi tạo!');
+            warning('Vui lòng chọn thư mục lưu video & frame trước khi tạo!');
             return;
         }
 
@@ -542,6 +606,10 @@ const VideoGenerator = () => {
         setOverallProgress({ current: 0, total: videoPrompts.length });
 
         try {
+            // Get SETTING CHUNG from parsed prompts
+            const settingChung = prompts.settingChung || '';
+            console.log('[VideoGenerator] SETTING CHUNG length:', settingChung.length);
+
             // Prepare prompts with extracted frames for continuity (optional)
             const promptsWithFrames = videoPrompts.map((prompt, index) => {
                 // Use index in the current batch (0-based), not originalIndex
@@ -559,11 +627,22 @@ const VideoGenerator = () => {
                     }
                 }
 
-                // Create enhanced prompt text with frame information
+                // Create enhanced prompt text based on scene position
                 let enhancedPromptText = prompt.text;
+
+                // First scene: Include SETTING CHUNG + Scene
+                if (index === 0 && settingChung) {
+                    enhancedPromptText = `${settingChung}\n\n---\n\n${prompt.text}`;
+                    console.log('[VideoGenerator] First scene: Adding SETTING CHUNG + Scene');
+                } else {
+                    // Subsequent scenes: Only scene content (no SETTING CHUNG)
+                    enhancedPromptText = prompt.text;
+                    console.log('[VideoGenerator] Subsequent scene: Only scene content');
+                }
+
+                // Add frame information if using extracted frames
                 if (videoConfig.useExtractedFrames && extractedFrame) {
-                    // Add frame file path information to the prompt
-                    enhancedPromptText = `[FRAME_FILE:${extractedFrame}]\n${prompt.text}`;
+                    enhancedPromptText = `[FRAME_FILE:${extractedFrame}]\n${enhancedPromptText}`;
                 }
 
                 return {
@@ -571,7 +650,8 @@ const VideoGenerator = () => {
                     text: enhancedPromptText,
                     extractedFrame: videoConfig.useExtractedFrames ? extractedFrame : null, // Include frame data for backend processing
                     sceneIndex: prompt.originalIndex, // Keep original scene number for reference
-                    batchIndex: index // Add batch index for debugging
+                    batchIndex: index, // Add batch index for debugging
+                    isFirstScene: index === 0 // Mark first scene for backend processing
                 };
             });
 
@@ -662,6 +742,12 @@ const VideoGenerator = () => {
 
         setActiveTab('create');
         setSelectedPromptId(item.promptId.toString());
+
+        // Reset merge states when loading history
+        setHasMerged(false);
+        setMergedVideoUrl(null);
+        setIsMerging(false);
+        setMergeProgress({ current: 0, total: 0 });
 
         // Parse and set prompts from prompt history
         const promptItem = promptHistory.find(p => p.id === item.promptId);
@@ -942,6 +1028,22 @@ const VideoGenerator = () => {
                                         </span>
                                     </label>
                                 </div>
+
+                                {/* Auto Merge Videos Toggle */}
+                                <div className="config-item">
+                                    <label className="config-label">Tự động ghép video:</label>
+                                    <label className="checkbox-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={videoConfig.autoMergeVideos}
+                                            onChange={(e) => setVideoConfig(prev => ({ ...prev, autoMergeVideos: e.target.checked }))}
+                                            disabled={isRunning || isMerging}
+                                        />
+                                        <span>
+                                            {videoConfig.autoMergeVideos ? 'Bật: Tự động ghép tất cả video thành 1 video hoàn chỉnh' : 'Tắt: Giữ riêng từng video scene'}
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
 
                             {/* Credit Information */}
@@ -954,33 +1056,31 @@ const VideoGenerator = () => {
 
                         {/* Thư mục lưu trữ (Bắt buộc) */}
                         <div className="form-group">
-                            <label>📁 Thư mục lưu trữ video (Bắt buộc):</label>
+                            <label>📁 Thư mục lưu trữ video & frame (Bắt buộc):</label>
                             <div className="save-path-group">
-                                <button
-                                    onClick={handleSelectFolder}
-                                    className="btn-secondary"
-                                    disabled={isRunning}
-                                >
-                                    📁 Chọn Thư Mục
-                                </button>
                                 <button
                                     onClick={handleSetDefaultFolder}
                                     className="btn-secondary"
                                     disabled={isRunning}
-                                    title="Set làm thư mục mặc định cho lần sau"
+                                    title="Chọn thư mục lưu video và frame, đồng thời set làm mặc định"
                                 >
-                                    ⭐ Set Mặc Định
+                                    📁 Chọn Thư Mục & Set Mặc Định
                                 </button>
                             </div>
                             {savePath ? (
                                 <div className="save-path-display success">
-                                    ✅ Lưu tại: {savePath}
+                                    ✅ Lưu video & frame tại: {savePath}
                                 </div>
                             ) : (
                                 <div className="save-path-display error">
                                     ❌ Chưa chọn thư mục lưu trữ
                                 </div>
                             )}
+                            <div className="save-path-info">
+                                <p className="hint-text">
+                                    💡 Video và khung hình (frame) sẽ được lưu cùng trong thư mục này
+                                </p>
+                            </div>
                         </div>
 
                         {/* Action Buttons */}
@@ -1089,9 +1189,15 @@ const VideoGenerator = () => {
                                                     </h4>
                                                 </div>
                                                 <div className="prompt-card-actions">
-                                                    <span className="ready-badge">
-                                                        🧱 + Scene
-                                                    </span>
+                                                    {index === 0 ? (
+                                                        <span className="ready-badge">
+                                                            🧱 + Scene (Đầu tiên)
+                                                        </span>
+                                                    ) : (
+                                                        <span className="ready-badge">
+                                                            🎬 Scene (Tiếp theo)
+                                                        </span>
+                                                    )}
                                                     {prompt.sceneNumber && prompt.sceneNumber.includes('.') && (
                                                         <span className="sub-scene-badge" title="Prompt con của cùng 1 cảnh">
                                                             🔗 Prompt con
@@ -1238,7 +1344,11 @@ const VideoGenerator = () => {
                                                     {/* Display scene-only text in card, but full text will be sent to Veo3 */}
                                                     <p className="prompt-text">{prompt.sceneOnly || prompt.text}</p>
                                                     <div className="prompt-info-badge">
-                                                        💡 Prompt này bao gồm SETTING CHUNG + Scene
+                                                        {index === 0 ? (
+                                                            <span>💡 Prompt đầu tiên: SETTING CHUNG + Scene (tạo video hoàn chỉnh)</span>
+                                                        ) : (
+                                                            <span>💡 Prompt tiếp theo: Chỉ Scene (sử dụng frame từ scene trước)</span>
+                                                        )}
                                                         {prompt.sceneNumber && prompt.sceneNumber.includes('.') && (
                                                             <span className="continuity-info">
                                                                 + Prompt con (ghép video để có thoại đầy đủ)
@@ -1259,7 +1369,7 @@ const VideoGenerator = () => {
                                                         onClick={handleOpenVideoFolder}
                                                         className="btn-view-video"
                                                     >
-                                                        📁 Mở thư mục lưu video
+                                                        📁 Mở thư mục lưu video & frame
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -1291,6 +1401,66 @@ const VideoGenerator = () => {
                                             className="progress-bar"
                                             style={{ width: `${(overallProgress.current / overallProgress.total) * 100}%` }}
                                         />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Video Merging Progress */}
+                            {isMerging && (
+                                <div className="merge-progress">
+                                    <div className="progress-header">
+                                        <span>🔄 Đang ghép video</span>
+                                        <span className="progress-text">
+                                            {mergeProgress.current}/{mergeProgress.total} video ({Math.round((mergeProgress.current / mergeProgress.total) * 100)}%)
+                                        </span>
+                                    </div>
+                                    <div className="progress-bar-wrapper">
+                                        <div
+                                            className="progress-bar merge-progress-bar"
+                                            style={{ width: `${(mergeProgress.current / mergeProgress.total) * 100}%` }}
+                                        />
+                                    </div>
+                                    <p className="merge-status">Đang ghép tất cả video thành 1 video hoàn chỉnh...</p>
+                                </div>
+                            )}
+
+                            {/* Merged Video Result */}
+                            {mergedVideoUrl && (
+                                <div className="merged-video-result">
+                                    <div className="result-header">
+                                        <h3>🎬 Video Hoàn Chỉnh</h3>
+                                        <span className="success-badge">✅ Đã ghép thành công</span>
+                                    </div>
+                                    <div className="merged-video-info">
+                                        <p className="video-path">📁 Đường dẫn: {mergedVideoUrl}</p>
+                                        <div className="merged-video-actions">
+                                            <button
+                                                onClick={() => window.electronAPI.openFile(mergedVideoUrl)}
+                                                className="btn-view-video"
+                                            >
+                                                📁 Mở thư mục
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(mergedVideoUrl);
+                                                    success('Đã copy đường dẫn!');
+                                                }}
+                                                className="btn-copy-url"
+                                            >
+                                                📋 Copy đường dẫn
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setHasMerged(false);
+                                                    setMergedVideoUrl(null);
+                                                    success('Đã reset trạng thái ghép video!');
+                                                }}
+                                                className="btn-secondary"
+                                                style={{ background: '#6B7280', color: 'white' }}
+                                            >
+                                                🔄 Reset
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}

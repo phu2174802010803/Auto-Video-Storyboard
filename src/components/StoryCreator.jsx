@@ -34,7 +34,7 @@ const StoryCreator = () => {
     const [urlIdea, setUrlIdea] = useState(() => loadFromStorage('urlIdea', ''));
     const [showSummary, setShowSummary] = useState(() => loadFromStorage('showSummary', true));
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-    const [duration, setDuration] = useState(() => loadFromStorage('duration', '2'));
+    const [duration, setDuration] = useState(() => loadFromStorage('duration', '1000'));
     const [customDuration, setCustomDuration] = useState(() => loadFromStorage('customDuration', ''));
     const [style, setStyle] = useState(() => loadFromStorage('style', '� Hoạt hình Pixar 3D (Mặc định)'));
     const [customStyle, setCustomStyle] = useState(() => loadFromStorage('customStyle', ''));
@@ -49,16 +49,18 @@ const StoryCreator = () => {
     const [progress, setProgress] = useState(0);
     const [progressStatus, setProgressStatus] = useState('');
     const [generatedStory, setGeneratedStory] = useState(() => loadFromStorage('generatedStory', ''));
+    const [isEditingStory, setIsEditingStory] = useState(false);
+    const [editedStory, setEditedStory] = useState('');
 
     // Calculate word count from duration
     const getWordCountFromDuration = (dur) => {
         const preset = VIDEO_DURATION_PRESETS.find(p => p.value === dur);
-        return preset ? preset.words : parseInt(dur) * 500; // 500 words per minute for custom
+        return preset ? preset.words : parseInt(dur); // Direct word count for custom
     };
 
     const finalDuration = duration === 'custom' ? customDuration : duration;
     const finalWordCount = duration === 'custom'
-        ? parseInt(customDuration) * 500
+        ? parseInt(customDuration) || 1000
         : getWordCountFromDuration(duration);
     const finalStyle = style === '✨ Tùy chỉnh' ? customStyle : style;
 
@@ -256,8 +258,8 @@ const StoryCreator = () => {
             return false;
         }
 
-        if (duration === 'custom' && !customDuration) {
-            warning('Vui lòng nhập thời lượng tùy chỉnh');
+        if (duration === 'custom' && (!customDuration || parseInt(customDuration) < 500)) {
+            warning('Vui lòng nhập số từ tùy chỉnh (tối thiểu 500 từ)');
             return false;
         }
 
@@ -398,6 +400,23 @@ const StoryCreator = () => {
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         success('Đã sao chép!');
+    };
+
+    // Story editing functions
+    const handleStartEditStory = () => {
+        setEditedStory(generatedStory);
+        setIsEditingStory(true);
+    };
+
+    const handleSaveEditedStory = () => {
+        setGeneratedStory(editedStory);
+        setIsEditingStory(false);
+        success('Đã lưu storyboard đã chỉnh sửa!');
+    };
+
+    const handleCancelEditStory = () => {
+        setEditedStory('');
+        setIsEditingStory(false);
     };
 
     return (
@@ -590,7 +609,7 @@ const StoryCreator = () => {
 
                     <div className="input-row">
                         <div className="input-group">
-                            <label>⏱️ Thời lượng video</label>
+                            <label>📊 Độ dài storyboard (số từ)</label>
                             <select value={duration} onChange={(e) => setDuration(e.target.value)}>
                                 {VIDEO_DURATION_PRESETS.map(preset => (
                                     <option key={preset.value} value={preset.value}>{preset.label}</option>
@@ -602,9 +621,9 @@ const StoryCreator = () => {
                                     type="number"
                                     value={customDuration}
                                     onChange={(e) => setCustomDuration(e.target.value)}
-                                    placeholder="Nhập số phút (1-60)"
-                                    min="1"
-                                    max="60"
+                                    placeholder="Nhập số từ (500-30000)"
+                                    min="500"
+                                    max="30000"
                                     className="custom-input"
                                 />
                             )}
@@ -715,7 +734,7 @@ const StoryCreator = () => {
                                         setUrlIdea('');
                                         setShowSummary(true);
                                         setGeneratedStory('');
-                                        setDuration('2');
+                                        setDuration('1000');
                                         setCustomDuration('');
                                         setStyle('� Hoạt hình Pixar 3D (Mặc định)');
                                         setCustomStyle('');
@@ -753,23 +772,58 @@ const StoryCreator = () => {
                             <div className="output-header">
                                 <h3>Nội dung đã tạo</h3>
                                 <div className="output-actions">
-                                    <button
-                                        className="btn-secondary"
-                                        onClick={() => copyToClipboard(generatedStory)}
-                                    >
-                                        📋 Sao chép
-                                    </button>
-                                    <button
-                                        className="btn-primary"
-                                        onClick={handleSave}
-                                    >
-                                        💾 Lưu
-                                    </button>
+                                    {!isEditingStory ? (
+                                        <>
+                                            <button
+                                                className="btn-secondary"
+                                                onClick={() => copyToClipboard(generatedStory)}
+                                            >
+                                                📋 Sao chép
+                                            </button>
+                                            <button
+                                                className="btn-edit"
+                                                onClick={handleStartEditStory}
+                                            >
+                                                ✏️ Chỉnh sửa
+                                            </button>
+                                            <button
+                                                className="btn-primary"
+                                                onClick={handleSave}
+                                            >
+                                                💾 Lưu
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                className="btn-success"
+                                                onClick={handleSaveEditedStory}
+                                            >
+                                                ✅ Lưu chỉnh sửa
+                                            </button>
+                                            <button
+                                                className="btn-secondary"
+                                                onClick={handleCancelEditStory}
+                                            >
+                                                ❌ Hủy
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="story-output">
-                                <pre>{generatedStory}</pre>
+                                {isEditingStory ? (
+                                    <textarea
+                                        value={editedStory}
+                                        onChange={(e) => setEditedStory(e.target.value)}
+                                        className="story-editor"
+                                        placeholder="Chỉnh sửa storyboard tại đây..."
+                                        rows={20}
+                                    />
+                                ) : (
+                                    <pre>{generatedStory}</pre>
+                                )}
                             </div>
                         </>
                     ) : (
