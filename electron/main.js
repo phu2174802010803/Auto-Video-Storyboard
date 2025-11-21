@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 const mammoth = require('mammoth');
 const officeParser = require('officeparser');
 
@@ -1128,146 +1127,6 @@ async function downloadVideoFromUrl(videoUrl, promptText, savePath, index) {
 }
 
 // ==========================================
-// VIDEO MERGING - Merge multiple videos into one
-// ==========================================
-
-// Merge multiple videos into one
-ipcMain.handle('merge-videos', async (event, { videoPaths, outputPath, outputFileName }) => {
-    try {
-        console.log('[VideoMerge] Starting video merge process...');
-        console.log('[VideoMerge] Input videos:', videoPaths.length);
-        console.log('[VideoMerge] Output path:', outputPath);
-        console.log('[VideoMerge] Output filename:', outputFileName);
-
-        if (!videoPaths || videoPaths.length < 2) {
-            return {
-                success: false,
-                error: 'Cần ít nhất 2 video để ghép'
-            };
-        }
-
-        // Check if all input videos exist
-        for (const videoPath of videoPaths) {
-            if (!fs.existsSync(videoPath)) {
-                return {
-                    success: false,
-                    error: `Video không tồn tại: ${videoPath}`
-                };
-            }
-        }
-
-        const outputFilePath = path.join(outputPath, outputFileName);
-
-        // Create FFmpeg command to merge videos
-        // Use concat filter for better quality and compatibility
-        const inputList = videoPaths.map(videoPath => `file '${videoPath.replace(/\\/g, '/')}'`).join('\n');
-        const listFilePath = path.join(outputPath, 'video_list.txt');
-
-        // Write input list file
-        fs.writeFileSync(listFilePath, inputList, 'utf8');
-
-        // FFmpeg command
-        const ffmpegCommand = [
-            '-f', 'concat',
-            '-safe', '0',
-            '-i', listFilePath,
-            '-c', 'copy', // Copy streams without re-encoding for speed
-            '-y', // Overwrite output file
-            outputFilePath
-        ];
-
-        console.log('[VideoMerge] FFmpeg command:', ffmpegCommand.join(' '));
-
-        // Execute FFmpeg
-        const ffmpegProcess = spawn('ffmpeg', ffmpegCommand);
-
-        let errorOutput = '';
-        let progressOutput = '';
-
-        ffmpegProcess.stderr.on('data', (data) => {
-            const output = data.toString();
-            errorOutput += output;
-            progressOutput += output;
-
-            // Parse progress from FFmpeg output
-            const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const seconds = parseInt(timeMatch[3]);
-                const centiseconds = parseInt(timeMatch[4]);
-
-                const totalSeconds = hours * 3600 + minutes * 60 + seconds + centiseconds / 100;
-                console.log('[VideoMerge] Progress:', totalSeconds, 'seconds processed');
-            }
-        });
-
-        ffmpegProcess.stdout.on('data', (data) => {
-            console.log('[VideoMerge] FFmpeg stdout:', data.toString());
-        });
-
-        return new Promise((resolve) => {
-            ffmpegProcess.on('close', (code) => {
-                console.log('[VideoMerge] FFmpeg process exited with code:', code);
-
-                // Clean up list file
-                try {
-                    if (fs.existsSync(listFilePath)) {
-                        fs.unlinkSync(listFilePath);
-                    }
-                } catch (cleanupError) {
-                    console.warn('[VideoMerge] Failed to clean up list file:', cleanupError);
-                }
-
-                if (code === 0) {
-                    // Check if output file was created
-                    if (fs.existsSync(outputFilePath)) {
-                        const stats = fs.statSync(outputFilePath);
-                        console.log('[VideoMerge] ✅ Merge completed successfully');
-                        console.log('[VideoMerge] Output file size:', stats.size, 'bytes');
-
-                        resolve({
-                            success: true,
-                            outputPath: outputFilePath,
-                            fileSize: stats.size,
-                            videoCount: videoPaths.length
-                        });
-                    } else {
-                        console.error('[VideoMerge] ❌ Output file not created');
-                        resolve({
-                            success: false,
-                            error: 'Không thể tạo file video ghép'
-                        });
-                    }
-                } else {
-                    console.error('[VideoMerge] ❌ FFmpeg failed with code:', code);
-                    console.error('[VideoMerge] Error output:', errorOutput);
-                    resolve({
-                        success: false,
-                        error: `Lỗi FFmpeg: ${errorOutput.slice(-500)}` // Last 500 chars of error
-                    });
-                }
-            });
-
-            ffmpegProcess.on('error', (error) => {
-                console.error('[VideoMerge] ❌ FFmpeg process error:', error);
-                resolve({
-                    success: false,
-                    error: `Lỗi khởi động FFmpeg: ${error.message}`
-                });
-            });
-        });
-
-    } catch (error) {
-        console.error('[VideoMerge] ❌ Merge error:', error);
-        return {
-            success: false,
-            error: error.message || 'Lỗi không xác định khi ghép video'
-        };
-    }
-});
-
-// ==========================================
 // PROMPT GENERATOR - Generate Video Prompts (JSON Format)
 // ==========================================
 ipcMain.handle('generate-video-prompts', async (event, { config, apiKey }) => {
@@ -1371,13 +1230,7 @@ FPS: 24
 Timeline metadata:
   series_id: "[Generate unique ID]"
   total_scenes: ${numPrompts}
-  continuity_mode: "strict",
-  continuity_reference: "semantic_only", // dùng continuity theo bố cục, không theo màu
-  reset_color_state_each_scene: true,
-  lighting_reset: true,
-  white_balance_mode: "reset_per_scene",
-  color_grading: "true_neutral",
-  contrast_preserve: true
+  continuity_mode: "strict"
 
 ---
 
@@ -1769,82 +1622,270 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
         event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
 
         const { GoogleGenerativeAI } = require('@google/generative-ai');
-        // ...existing code...
+        const genAI = new GoogleGenerativeAI(apiKey);
 
         // Use selected model with fallback to default
         const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
-        try {
-            event.sender.send('progress-update', { progress: 0, status: 'Đang khởi tạo tạo prompt...' });
-            const { GoogleGenerativeAI } = require('@google/generative-ai');
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const modelToUse = selectedModel || "gemini-2.5-flash-lite";
-            const model = genAI.getGenerativeModel({
-                model: modelToUse,
-                generationConfig: {
-                    maxOutputTokens: 8192,
-                    temperature: 0.7,
-                    topP: 0.8,
-                    topK: 40,
-                }
-            });
-
-            // Tạo SETTING CHUNG một lần
-            let allPrompts = '';
-            let settingChung = '';
-            let progress = 0;
-            const totalScenes = storyboard.scenes.length;
-
-            // Prompt cho SETTING CHUNG
-            const settingPrompt = `Bạn là chuyên gia tạo prompt video giáo dục. Hãy tạo phần "🧱 SETTING CHUNG" cho storyboard sau, chỉ viết phần này, không viết các scene.\n\n${JSON.stringify(storyboard, null, 2)}`;
-            const settingResult = await model.generateContent(settingPrompt);
-            const settingText = settingResult.text();
-            settingChung = settingText.trim();
-            allPrompts += settingChung + '\n\n---\n\n';
-            event.sender.send('progress-update', { progress: 5, status: 'Đã tạo xong SETTING CHUNG' });
-
-            // Lặp qua từng scene, gửi từng scene cho AI
-            for (let i = 0; i < totalScenes; i++) {
-                let scene = storyboard.scenes[i];
-                let scenePrompt = `Bạn là chuyên gia tạo prompt video giáo dục. Hãy tạo prompt chi tiết cho scene ${i + 1} dựa trên thông tin sau:\n\n${JSON.stringify(scene, null, 2)}\n\nYêu cầu: Viết bằng tiếng Việt, phong cách hoạt hình Pixar, đầy đủ chi tiết, không bỏ dở giữa chừng.`;
-                let sceneResult = '';
-                let isComplete = false;
-                let attempts = 0;
-                const maxAttempts = 3;
-
-                while (!isComplete && attempts < maxAttempts) {
-                    const response = await model.generateContent(scenePrompt);
-                    const text = response.text();
-                    sceneResult += text;
-
-                    // Kiểm tra nếu kết quả đã hoàn chỉnh (có thể tùy chỉnh logic này)
-                    if (text.length > 500 || /\b(kết thúc|end scene|hết cảnh|scene end)\b/i.test(text)) {
-                        isComplete = true;
-                    } else {
-                        // Nếu chưa hoàn chỉnh, gửi tiếp prompt "Tiếp tục hoàn thiện scene này, bắt đầu từ: ..."
-                        scenePrompt = `Tiếp tục hoàn thiện scene này, bắt đầu từ: \"${sceneResult.slice(-100)}\"`;
-                    }
-                    attempts++;
-                }
-
-                allPrompts += `🎞️ Scene ${i + 1}\n${sceneResult.trim()}\n\n---\n\n`;
-                progress = Math.round(((i + 1) / totalScenes) * 95) + 5;
-                event.sender.send('progress-update', { progress, status: `Đã tạo xong scene ${i + 1}` });
+        // CRITICAL: Max output tokens to prevent truncation for long storyboards
+        const model = genAI.getGenerativeModel({
+            model: modelToUse,
+            generationConfig: {
+                maxOutputTokens: 65536,  // Maximum for Gemini 2.5 models (was 8192 - caused truncation)
+                temperature: 0.7,
             }
+        });
 
-            event.sender.send('progress-update', { progress: 100, status: 'Hoàn tất tạo prompts!' });
-            return {
-                success: true,
-                data: allPrompts.trim()
-            };
-        } catch (error) {
-            console.error('Structured prompt generation error:', error);
-            event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
-            return {
-                success: false,
-                error: error.message || 'Unknown error occurred'
-            };
+        event.sender.send('progress-update', { progress: 10, status: 'Đang phân tích storyboard...' });
+
+        // Build system prompt with detailed template
+        const dialogueDurationNote = enableDialogueSeconds && Number(dialogueSeconds) > 0
+            ? `\n\n⏱️ RÀNG BUỘC THỜI LƯỢNG THOẠI QUAN TRỌNG:\n- Mỗi cảnh phải có tổng thời lượng THOẠI kéo dài khoảng ${Number(dialogueSeconds)} giây (±1 giây)\n- Tính toán: Tốc độ đọc tiếng Việt tự nhiên ≈ 2.5-3 từ/giây\n- Số từ cần viết: ~${Math.floor(Number(dialogueSeconds) * 2.5)} - ${Math.floor(Number(dialogueSeconds) * 3)} từ\n- Chia nhỏ lời thoại theo mốc thời gian trong Beat plan\n- Đảm bảo thoại đủ dài để lấp đầy ${Number(dialogueSeconds)} giây khi đọc với giọng tự nhiên`
+            : '';
+
+        const systemPrompt = `You are an expert video prompt creator for educational videos.
+
+**Task:** Generate structured video prompts following this EXACT format.
+
+**INPUT:** You will receive a storyboard with scenes, characters, and story details.
+
+📊 QUAN TRỌNG - CHIA CẢNH THEO THOẠI:
+- Mỗi prompt video chỉ tạo được ~8 giây
+- Tốc độ đọc tiếng Việt tự nhiên: ~2.5-3 từ/giây
+- Nếu thoại trong 1 cảnh > 20-25 từ → PHẢI CHIA thành nhiều prompt con
+- Ví dụ: Cảnh 1 có thoại 60 từ → Chia thành Cảnh 1.1, 1.2, 1.3 (mỗi prompt ~20 từ)
+- Các prompt con phải liên tục về hình ảnh và nội dung
+- Nhân vật giữ nguyên tư thế, biểu cảm trong các prompt con của cùng 1 cảnh
+
+**OUTPUT FORMAT:**
+
+First, generate SETTING CHUNG (general settings) - generated ONCE:
+
+🧱 SETTING CHUNG
+
+Phong cách: Video hoạt hình 3D Pixar, tông màu ấm, phù hợp giáo dục học sinh VN.
+
+Địa điểm: [Lấy từ storyboard - lớp học/sân trường VN]
+
+Nhân vật chính:
+  [Tên nhân vật]: 
+    - Tuổi [12-14 tuổi], học sinh VN
+    - Khuôn mặt [tròn/oval], mắt [đen/nâu], da [sáng/ngăm], nụ cười [tươi/hiền]
+    - Tóc đen [ngắn gọn/dài vai, thẳng/xoăn]
+    - Mặc đồng phục: áo trắng, quần [xanh navy/váy], khăn đỏ
+    - Tính cách: [tò mò/nhiệt tình/trầm tính]
+    ⚠️ Giữ nguyên hình dáng nhân vật này trong TẤT CẢ các cảnh
+
+Bối cảnh:
+  - Lớp học sáng sủa, ánh sáng tự nhiên từ cửa sổ bên trái
+  - Bàn ghế gỗ, bảng đen/trắng, cây xanh ngoài cửa sổ
+  - Không khí ấm áp, thân thiện
+  - Âm thanh nhẹ: giấy viết, bút chì, tiếng chim
+
+Góc quay: Nhìn thẳng hoặc từ trên xuống (khi vẽ hình), ổn định, không rung lắc.
+
+⛔ LƯU Ý QUAN TRỌNG: 
+  • KHÔNG hiển thị chữ/số/công thức (AI không render đúng)
+  • Thay bằng vật thể hình ảnh + nhân vật nói
+  • 🗣️ THOẠI BẮT BUỘC BẰNG TIẾNG VIỆT - Giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
+
+🎭 QUY TẮC XỬ LÝ NHÂN VẬT THOẠI:
+  • Nếu scene chỉ có 1 nhân vật thoại: Nhân vật còn lại phải có biểu cảm lắng nghe chăm chú, gật đầu, mỉm cười, hoặc im lặng quan sát
+  • KHÔNG BAO GIỜ để nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
+  • Nhân vật lắng nghe: Mắt nhìn vào người nói, tư thế chú ý, có thể gật đầu nhẹ hoặc mỉm cười đồng tình
+  • Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
+
+Thời lượng mỗi cảnh: 10 giây
+
+---
+
+Then, for EACH scene in storyboard, analyze dialogue length and generate:
+
+**BƯỚC 1: Phân tích thoại**
+- Đếm số từ trong thoại của cảnh
+- Nếu ≤ 25 từ: Tạo 1 prompt (Scene X)
+- Nếu 26-50 từ: Tạo 2 prompts (Scene X.1, X.2)  
+- Nếu 51-75 từ: Tạo 3 prompts (Scene X.1, X.2, X.3)
+- Nếu > 75 từ: Tạo 4+ prompts tương ứng
+
+**BƯỚC 2: Chia thoại hợp lý**
+- Chia theo câu hoàn chỉnh (không cắt giữa câu)
+- Mỗi đoạn ~20-25 từ (để đủ 8 giây video)
+- Đảm bảo ý nghĩa liên tục giữa các đoạn
+
+**BƯỚC 3: Tạo prompt cho mỗi đoạn**
+
+🎞️ Scene [số].[sub] (nếu có nhiều prompt con, VD: 1.1, 1.2, 1.3)
+
+Mục đích: [Học sinh sẽ hiểu/học được gì - CHỈ GHI Ở PROMPT ĐẦU TIÊN của cảnh]
+
+Mô tả cảnh:
+  - Nhân vật: [Tên - với đặc điểm như đã mô tả trong SETTING CHUNG]
+  - Bối cảnh: [Ở đâu, có gì xung quanh - GIỐNG NHAU cho các prompt con]
+  - Vật dụng: [Sách, bút, hình vẽ, mô hình...]
+  - 🔗 [Nếu là prompt con thứ 2+] Tiếp nối từ Scene [số].[sub-1]
+
+Diễn biến (8 giây):
+  • Giây 0-2: [Nhân vật tiếp tục từ tư thế trước (nếu là prompt con) hoặc bắt đầu mới]
+  • Giây 2-6: [Nói thoại đoạn này - nhân vật giữ nguyên tư thế, chỉ miệng động]
+  • Giây 6-8: [Kết thúc đoạn thoại - chờ prompt tiếp theo HOẶC chuyển cảnh]
+
+Hành động nhân vật: [Mô tả chi tiết cử chỉ, nét mặt, tương tác với vật]
+
+🎭 BIỂU CẢM NHÂN VẬT KHÔNG THOẠI:
+- Nếu có nhân vật không nói trong scene: Mô tả biểu cảm lắng nghe chăm chú
+- Ví dụ: "Nhân vật B ngồi im lặng, mắt nhìn chăm chú vào nhân vật A, gật đầu nhẹ khi hiểu, mỉm cười đồng tình"
+- KHÔNG BAO GIỜ: "Nhân vật B mở miệng như đang nói" hoặc "Nhân vật B có biểu cảm như đang phát biểu"
+- Luôn nhấn mạnh: Nhân vật im lặng = biểu cảm lắng nghe, không phải biểu cảm nói
+
+Góc quay: [Nhìn từ đâu, có di chuyển máy không]
+
+Không khí: [Vui vẻ/tập trung/phấn khởi/...]
+
+Ánh sáng: Giữ sáng tự nhiên từ cửa sổ bên trái như SETTING CHUNG
+
+⚠️ Nhắc nhở: Không có chữ/số hiện trên màn hình. Chỉ dùng hình ảnh và lời nói.
+
+Chuyển cảnh: [Mượt mà sang cảnh tiếp theo như thế nào]
+
+Thoại (🗣️ BẮT BUỘC TIẾNG VIỆT - ~20-25 từ cho prompt này - giọng đọc tự nhiên, rõ ràng):
+  [Tên nhân vật]: "[CHỈ phần thoại cho prompt này - khoảng 20-25 từ - đủ cho 8 giây video]"
+  
+  🎭 NHÂN VẬT KHÔNG THOẠI:
+  - [Tên nhân vật 2]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
+  - [Tên nhân vật 3]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
+  
+💡 VÍ DỤ CHIA THOẠI:
+- Thoại gốc (60 từ): "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa. Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu. Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?"
+
+- Scene 1.1: 
+  * Vy: "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa." (25 từ)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
+
+- Scene 1.2: 
+  * Vy: "Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu." (21 từ)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
+
+- Scene 1.3: 
+  * Vy: "Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?" (33 từ - có thể chia tiếp nếu cần)
+  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
+
+⚠️ QUAN TRỌNG: 
+- Toàn bộ thoại phải bằng TIẾNG VIỆT, không dùng tiếng Anh
+- Mỗi prompt chỉ chứa 1 ĐOẠN NGẮN của thoại (20-25 từ)
+- Các prompt con (1.1, 1.2, 1.3) ghép lại = thoại đầy đủ của cảnh gốc
+
+🎭 LƯU Ý VỀ NHÂN VẬT THOẠI:
+- Chỉ nhân vật được chỉ định mới có thoại trong prompt này
+- Nhân vật còn lại: Biểu cảm lắng nghe chăm chú TRONG TẤT CẢ các prompt con
+- Giữ nguyên tư thế, biểu cảm lắng nghe xuyên suốt các prompt con của cùng 1 cảnh
+- BẮT BUỘC ghi rõ trong phần "NHÂN VẬT KHÔNG THOẠI" để AI hiểu rõ ai không nói
+- Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
+
+---
+
+**YÊU CẦU QUAN TRỌNG:**
+
+1. Format output: Text thường với tiêu đề emoji (🧱 🎞️), KHÔNG dùng JSON
+
+2. SETTING CHUNG viết 1 lần duy nhất ở đầu
+
+3. ⚠️ BẮT BUỘC: Phải xử lý TẤT CẢ các cảnh trong storyboard
+   - VD: Storyboard có 12 cảnh → Phải xử lý đủ 12 cảnh
+   - Mỗi cảnh CÓ THỂ tạo nhiều prompt con nếu thoại dài
+   - VD: Cảnh 1 (60 từ) → Scene 1.1, 1.2, 1.3
+   - VD: Cảnh 2 (20 từ) → Scene 2 (chỉ 1 prompt)
+   - TỔNG SỐ PROMPT có thể > số cảnh gốc (do chia nhỏ)
+   - KHÔNG được dừng giữa chừng!
+
+3b. 📊 QUY TẮC CHIA CẢNH THÀNH PROMPT:
+   - Đọc thoại của cảnh trong storyboard
+   - Đếm số từ trong thoại
+   - Nếu ≤ 25 từ: 1 prompt (Scene X)
+   - Nếu 26-50 từ: 2 prompts (Scene X.1, X.2)
+   - Nếu 51-75 từ: 3 prompts (Scene X.1, X.2, X.3)
+   - Nếu > 75 từ: 4+ prompts
+   - Chia thoại theo câu hoàn chỉnh, mỗi đoạn ~20-25 từ
+   - Các prompt con giữ nguyên hình ảnh, chỉ khác thoại
+
+4. Ngôn ngữ & Thoại:
+   - Tất cả nội dung bằng TIẾNG VIỆT
+   - Thoại: 🗣️ BẮT BUỘC TIẾNG VIỆT - giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
+   - Không dùng tiếng Anh trong thoại
+   - Giải thích chi tiết, dễ hiểu${enableDialogueSeconds && Number(dialogueSeconds) > 0 ? `\n   - ⏱️ QUAN TRỌNG: Viết thoại đủ dài để đọc trong ${Number(dialogueSeconds)} giây (khoảng ${Math.floor(Number(dialogueSeconds) * 2.5)}-${Math.floor(Number(dialogueSeconds) * 3)} từ tiếng Việt)` : ''}
+
+5. 🎭 XỬ LÝ NHÂN VẬT THOẠI:
+   - Nếu scene có 2+ nhân vật nhưng chỉ 1 người nói: Nhân vật còn lại PHẢI có biểu cảm lắng nghe
+   - Biểu cảm lắng nghe: Mắt nhìn chăm chú, gật đầu, mỉm cười, tư thế chú ý
+   - TUYỆT ĐỐI KHÔNG: Nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
+   - Mục đích: Tránh lỗi AI render nhầm thoại cho nhân vật sai
+
+6. Mô tả nhân vật phải chi tiết:
+   - Tuổi, khuôn mặt (tròn/oval/vuông)
+   - Mắt (màu, to/nhỏ), mũi, miệng (nụ cười)
+   - Tóc (kiểu, màu, dài/ngắn)
+   - Trang phục cụ thể (áo trắng, quần xanh, khăn đỏ)
+   → Đủ chi tiết để AI vẽ giống hệt nhau ở MỌI cảnh
+
+7. Giữ nhất quán:
+   - Nhân vật: Khuôn mặt, tóc, trang phục GIỐNG HỆT mọi cảnh
+   - Bối cảnh: Lớp học, bàn ghế, ánh sáng GIỐNG NHAU
+   - Âm thanh: Không đổi
+
+8. ⛔ TUYỆT ĐỐI KHÔNG có chữ/số/công thức trên màn hình:
+   - Lý do: AI video không vẽ đúng chữ số
+   - Giải pháp: Dùng vật thể hình ảnh + nhân vật nói
+
+9. Phong cách: Video 3D Pixar - mềm mại, biểu cảm, màu sắc ấm${dialogueDurationNote}`;
+
+        const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
+
+        event.sender.send('progress-update', { progress: 20, status: 'Đang tạo SETTING CHUNG...' });
+
+        console.log('🎬 Generating structured prompts...');
+
+        const result = await model.generateContent(systemPrompt + '\n\n' + userPrompt);
+
+        event.sender.send('progress-update', { progress: 60, status: 'Đang tạo prompts cho từng cảnh...' });
+
+        const response = await result.response;
+        const text = response.text();
+
+        event.sender.send('progress-update', { progress: 85, status: 'Đang hoàn thiện prompts...' });
+
+        console.log('✅ Structured prompts generated');
+        console.log(`📊 Output length: ${text.length} characters`);
+
+        // Verify all scenes were generated
+        const sceneMatches = text.match(/🎞️.*PROMPT.*Scene/gi);
+        const sceneCount = sceneMatches ? sceneMatches.length : 0;
+        console.log(`📝 Generated ${sceneCount} scene prompts`);
+
+        // Warning if scene count seems low (but don't block - let user decide)
+        if (sceneCount < 5) {
+            console.warn(`⚠️ Warning: Only ${sceneCount} scenes generated. Output may be truncated.`);
         }
+
+        event.sender.send('progress-update', { progress: 100, status: 'Hoàn tất tạo prompts!' });
+
+        return {
+            success: true,
+            data: text.trim()
+        };
+
+    } catch (error) {
+        console.error('Structured prompt generation error:', error);
+        event.sender.send('progress-update', { progress: 0, status: 'Lỗi: ' + error.message });
+        return {
+            success: false,
+            error: error.message || 'Unknown error occurred'
+        };
+    }
+});
+
+// Generate character image using Gemini (Tab 2)
+ipcMain.handle('generate-character-image', async (event, { prompt, apiKey, referenceImage }) => {
+    try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -2699,7 +2740,7 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, v
                     // 4.5.3: Click "+" (add) button
                     logMessage(prompt.id, 'Dang click nut "+" de them khung hinh...', 'processing');
                     await page.evaluate(() => {
-                        const button = document.evaluate('/html/body/div/div[2]/div/div/div[2]/div/div[1]/div[2]/div/div/div[2]/div[1]/div/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        const button = document.evaluate('/html/body/div[1]/div[2]/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/div/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
                         if (button) {
                             button.click();
                             console.log('[Veo3] Clicked "+" add button via XPath');
@@ -3013,9 +3054,7 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, v
 
                 // Type prompt character by character (NO PASTE)
                 // IMPORTANT: Replace all newlines with spaces to prevent accidental submit
-                // Add lighting reset instruction to prevent color drift
-                const lightingResetText = "\nLighting resets to neutral daylight (5200K, no yellow tint) before this shot. Maintain balanced exposure, no hue shift, preserve highlight contrast.";
-                const promptTextSingleLine = (prompt.text + lightingResetText).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                const promptTextSingleLine = prompt.text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
                 logMessage(prompt.id, `Đang typing prompt (${promptTextSingleLine.length} ký tự)...`, 'processing');
                 console.log(`[Veo3] Starting to type ${promptTextSingleLine.length} characters...`);
@@ -3253,12 +3292,6 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, v
                                 .sort((a, b) => b.mtime - a.mtime)[0];
                             const framePath = path.join(frameDir, latestFrame.name);
                             console.log(`[Veo3] ✅ Frame saved: ${path.basename(framePath)}`);
-
-                            // ❌ CRITICAL: Do NOT use latestFrame as input for next scene
-                            // This prevents warm color drift and quality degradation
-                            // Note: Frame is saved for reference only, NOT fed as input to next scene
-                            console.log(`[Veo3] 📝 Note: Frame saved for reference only - NOT used as input for next scene to prevent color drift`);
-
                             // Don't send log to avoid overwriting UI status
                         } else {
                             console.log(`[Veo3] ⚠️ Frame not detected yet (next scene will wait)`);
