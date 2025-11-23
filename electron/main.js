@@ -484,142 +484,122 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
             stylePrompt = `\nPhong cách hình ảnh: ${style}`;
         }
 
-        // Calculate scenes and duration based on user input
-        const durationMinutes = parseInt(duration || wordCount / 500 || 2); // duration in minutes, fallback to wordCount or default 2
-        const totalSeconds = durationMinutes * 60;
+        // Calculate scenes and duration based on word count
+        // ~200 words per main scene (Vietnamese reading speed)
+        // Each main scene = ~10 seconds
+        const wordsPerScene = 200;
         const mainSceneDuration = 10; // seconds per main scene
         const bridgeSceneDuration = 3; // seconds per bridge scene
 
-        let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
+        // Calculate number of main scenes based on word count
+        numMainScenes = Math.max(3, Math.round(finalWordCount / wordsPerScene));
+
+        let numBridgeScenes, sceneStructure, totalDuration;
 
         if (addBridgeScenes) {
-            // Calculate with bridge scenes: every 2 main scenes need 1 bridge
-            numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
+            // Calculate with bridge scenes
             numBridgeScenes = Math.max(0, numMainScenes - 1); // bridges between main scenes
             const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
-            sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} cảnh chính + ${numBridgeScenes} cảnh bridge)`;
+            sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} chính + ${numBridgeScenes} bridge)`;
             totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         } else {
             // Calculate without bridge scenes
-            numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
             numBridgeScenes = 0;
             const actualDuration = numMainScenes * mainSceneDuration;
-            sceneStructure = `${numMainScenes} cảnh chính`;
+            sceneStructure = `${numMainScenes} cảnh`;
             totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         }
 
-        const prompt = `Hãy tạo storyboard video giáo dục toán học CHUẨN CHUYÊN NGHIỆP cho chủ đề sau:
+        // Build advanced options description
+        let advancedOptions = '';
+
+        if (addBridgeScenes) {
+            advancedOptions += '\n📍 CÓ CẢH BRIDGE: Thêm cảnh chuyển động tự nhiên giữa các cảnh chính để liên kết mượt mà.';
+        }
+
+        if (hideFormulas) {
+            advancedOptions += '\n🚫 CẤM TEXT/CÔNG THỨC: TUYỆT ĐỐI KHÔNG hiển thị chữ/số/công thức trên màn hình. Thay bằng:\n   • Biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay)\n   • THOẠI DÀI, CHI TIẾT từ nhân vật giải thích\n   • Hành động trực quan từ nhân vật';
+        }
+
+        if (ensureContinuity) {
+            advancedOptions += '\n🔗 ĐẢM BẢO CONTINUITY CHẶT CHẼ:\n   • Ánh sáng 5200K không thay đổi (không vàng, không lạnh)\n   • Hướng bóng đổ nhất quán từ trái qua phải\n   • Vị trí nhân vật không "teleport" giữa các cảnh\n   • Props (bàn, ghế, đồ dùng) ở cùng vị trí\n   • Không cắt ngang hành động của nhân vật';
+        }
+
+        const prompt = `Hãy tạo storyboard video giáo dục toán học CHẤT LƯỢNG CAO cho chủ đề sau:
 
 Chủ đề: ${idea}${stylePrompt}
 ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 
+⚙️ CẤU HÌNH:${advancedOptions}
+
 📋 CHUẨN STORYBOARD XUẤT:
 
-**Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề hấp dẫn]"
 
-👥 Nhân vật (MÔ TẢ CHI TIẾT PIXAR-LEVEL để AI tái tạo đúng):
-[Tên]: [reference_tag: [Name]_consistent]
-  • Tuổi: [12 tuổi]
-  • Khuôn mặt: [tròn/vuông/oval], mắt [màu nâu/đen, to/nhỏ, biểu cảm gì], mũi [nhỏ/cao/tẹt], miệng [nụ cười rộng/nhỏ], da [sáng/ngăm đen], điểm đặc biệt [má lúm đồng tiền/vết chàm/...]
-  • Tóc: [đen/nâu], [ngắn gọn/dài vai], [thẳng/xoăn], [chi tiết: chải ngôi giữa/buộc đuôi gà/...]
-  • Thân hình: chiều cao [145cm/150cm/...], dáng [gầy/mập/khỏe], tư thế [tự tin/nhút nhát]
-  • Trang phục: áo [trắng tay ngắn đồng phục], quần [xanh navy dài], khăn [đỏ cột cổ], giày [thể thao trắng]
-  • Tính cách: [tò mò, năng lượng cao, hay cười, nhiệt tình/trầm tính, suy nghĩ sâu, ít nói]
-  • Animation style: Pixar-inspired 3D semi-realistic
-  • ⚠️ GIỮ NGUYÊN thiết kế này TRONG MỌI CẢNH
+👥 Nhân vật:
+[Tên]: [reference_tag: consistent]
+  • Tuổi, khuôn mặt, mắt (màu sắc, biểu cảm)
+  • Tóc, trang phục (áo, quần, khăn, giày)
+  • Tính cách, cảm xúc
+  • GIỮ NGUYÊN HÌNH DÁNG TRONG TOÀN BỘ STORYBOARD
 
-[Tên 2]: [Mô tả tương tự với cùng mức độ chi tiết...]
+🎨 Bối cảnh:
+- Địa điểm: [lớp học/sân trường/...]
+- Ánh sáng: Tự nhiên 5200K (không thay đổi)
+- Âm thanh: Ambient nhẹ (không nhạc nền)
+- Tông màu: Ấm, thân thiện
 
-🎨 Bối cảnh tổng thể:
-[Địa điểm chính: lớp học/sân trường/...], có [bàn ghế gỗ, bảng đen, cây xanh qua cửa sổ, ...].
-Ánh sáng: [tự nhiên qua cửa sổ bên trái, 5200K neutral daylight, bóng đổ hướng nhất quán].
-Âm thanh: [tiếng chim hót nhẹ, giấy xào xạc, bút viết, ambient loop: classroom_soft_ambience].
-Màu sắc: [tông ấm trung tính, palette lớp học Việt Nam].
-🎨 Phong cách BẮT BUỘC: Hoạt hình Pixar 3D (ANIMATED CHARACTERS, NOT REAL PEOPLE)
-  - Nhân vật: Hoạt hình 3D phong cách Pixar/Disney, mắt biểu cảm, ánh sáng mềm
-  - Chất lượng: Chuyển động mượt mà, animation facial tự nhiên
-  - Thẩm mỹ: Màu sắc ấm áp, thân thiện với giáo dục
-  - ${hideFormulas ? 'Geometry-only (không công thức, không chữ)' : 'Full animated style'}
-  - ⚠️ KHÔNG sử dụng người thật, KHÔNG live-action footage
-Tổng thời lượng: ${totalDuration} (${sceneStructure}).
-Timeline metadata: series_id "[TitleSlug]", continuity_mode "strict".
-${hideFormulas ? 'Không có text, công thức, hoặc số liệu hiển thị trên màn hình — toàn bộ nội dung được thể hiện qua thoại và hành động.' : ''}
+🎨 Phong cách: Hoạt hình Pixar 3D (KHÔNG người thật, KHÔNG live-action)
 
-**Format từng cảnh:**
+⏱️ Tổng thời lượng: ${totalDuration} (${sceneStructure})
+${hideFormulas ? '⛔ QUAN TRỌNG: Không hiển thị text/công thức/số - tất cả qua thoại' : ''}
 
-${addBridgeScenes ? `🎞 CẢNH 1 – [Tên cảnh] (0–10s)
+**Từng cảnh (định dạng ngắn gọn):**
 
-Goal: [Mục đích giáo dục]
-Bối cảnh: [Chi tiết môi trường]
-
-Beat plan:
-- 0–3s → [Hành động cụ thể]
-- 3–7s → [Hành động tiếp theo]
-- 7–10s → Giữ khung freeze – [Mô tả freeze frame]
-
-Camera: [Mid-shot/Close-up/Wide shot, pan/tilt direction]
-
-Thoại (Chi tiết, đầu tư - giúp người xem hiểu rõ):
-[Tên]: "[Lời thoại dài, chi tiết, giải thích kỹ càng - VD: 'Các em chú ý nhé, giờ thầy sẽ giải thích tại sao định lý này quan trọng. Đầu tiên, chúng ta cần hiểu rằng...' - Thoại DÀI OK, không giới hạn độ dài, ưu tiên giúp người xem hiểu]"
-[Tên]: "[Phản hồi chi tiết - VD: 'Dạ em hiểu rồi ạ! Vậy là nếu chúng em áp dụng công thức này vào bài toán thực tế, thì chúng em có thể...' - Thoại tự nhiên, sinh động]"
-[Nếu có thêm người]: "[Tiếp tục đối thoại chi tiết, giải thích, đặt câu hỏi, làm rõ khái niệm...]"
-
-💡 LƯU Ý QUAN TRỌNG VỀ THOẠI:
-- Thoại PHẢI DÀI và CHI TIẾT để giúp người nghe hiểu rõ nội dung
-- Không lo thoại dài (người dùng sẽ ghép thoại vào sau)
-- Giải thích đầy đủ khái niệm, ví dụ, lý do
-- Thoại tự nhiên như giáo viên đang giảng bài thực tế
-- Bao gồm: giới thiệu → giải thích → ví dụ → kết luận
-
-Cảm xúc: [Tò mò/vui vẻ/tập trung...]
-Transition: [Pan/Cut/Fade sang cảnh tiếp]
-
-� CẢNH 1.5 – [Tên Bridge Scene] (10–13s) (Bridge Scene)
-
-Goal: [Tạo chuyển cảnh tự nhiên từ X sang Y]
-Bối cảnh: [Không gian liền kề, cùng ánh sáng]
-Hành động:
-[Mô tả di chuyển ngắn gọn]
-Camera: [Wide shot từ sau lưng/pan direction]
-Âm thanh: [Tiếng bước chân, gió...]
-Transition: [Cut sang cảnh tiếp theo]
-
-🎞 CẢNH 2 – [Tên cảnh] (13–23s)
-[Tiếp tục format tương tự...]` : `🎞 CẢNH 1 – [Tên cảnh] (0–10s)
-
+${addBridgeScenes ? `🎞 CẢNH 1 (0–10s)
 Goal: [Mục đích]
-Scene description: [Mô tả hình ảnh]
-Beat plan:
-- 0–3s → [Hành động]
-- 3–7s → [Hành động]  
-- 7–10s → Giữ 3s – [Freeze instruction]
+Setting: [Bối cảnh]
+Action: [Hành động 0-3s] → [Hành động 3-7s] → [Freeze 7-10s]
+Camera: [Mid-shot/Close-up + hướng di chuyển]
+Dialogue: [Nhân vật A]: "[Thoại ngắn gọn nhưng đủ ý]"
+          [Nhân vật B nếu có]: "[Thoại hoặc phản ứng]"
+Emotion: [Tò mò/vui vẻ/tập trung]
+Transition: [Cut/Fade sang cảnh tiếp]
+
+🎞 CẢNH 1.5 (10–13s) - Bridge Scene
+Goal: Chuyển động tự nhiên
+Action: [Di chuyển ngắn gọn]
+Camera: [Wide shot]
+Transition: [Cut sang cảnh 2]
+
+🎞 CẢNH 2 (13–23s)
+[Tiếp tục format...]` : `🎞 CẢNH 1 (0–10s)
+Goal: [Mục đích]
+Setting: [Bối cảnh]
+Action: [Hành động]
 Camera: [Góc quay]
-Action: [Nhân vật làm gì]
-Lighting: [Chất lượng ánh sáng]
+Dialogue: [Nhân vật]: "[Thoại]"
+Emotion: [Cảm xúc]
+Transition: [Chuyển cảnh]
 
-Thoại (Chi tiết, đầu tư - giúp người xem hiểu rõ):
-[Tên]: "[Lời thoại dài, chi tiết, giải thích kỹ càng - Ưu tiên nội dung phong phú, không giới hạn độ dài, tự nhiên như giáo viên giảng bài thực tế]"
-[Tên khác]: "[Phản hồi chi tiết, đặt câu hỏi, làm rõ khái niệm...]"
+🎞 CẢNH 2 (10–20s)
+[Tiếp tục...]`}
 
-💡 THOẠI: Dài, chi tiết, giải thích đầy đủ (không lo thoại dài, người dùng sẽ ghép vào sau)
+✅ CÁCH THỰC HIỆN (BẮT BUỘC):
+1. ⚠️ Tạo ĐÚNG ${numMainScenes} cảnh chính - không được nhiều hơn, không được ít hơn
+${addBridgeScenes ? `2. Thêm ${numBridgeScenes} cảnh bridge (chuyển động tự nhiên giữa các cảnh chính)` : `2. KHÔNG thêm cảnh bridge - chỉ cảnh chính`}
+3. Mỗi cảnh chính: ~10 giây, hành động cụ thể + thoại rõ ràng
+${hideFormulas ? `4. 🚫 TUYỆT ĐỐI không viết chữ/số/công thức trên màn hình - dùng biểu diễn trực quan + thoại dài` : `4. Có thể hiển thị text/công thức nếu cần thiết`}
+${ensureContinuity ? `5. Đảm bảo continuity: ánh sáng (5200K), bóng đổ, vị trí nhân vật, props không đổi giữa các cảnh` : `5. Chuyển cảnh tự nhiên`}
+6. Thoại: Tự nhiên, dễ hiểu, khoa học chính xác
 
-Hold instruction: [Giữ khung hình gì]
-Transition: [Chuyển cảnh như thế nào]`}
+🚨 KIỂM TRA LẠI:
+- Số cảnh chính = ${numMainScenes} ✓
+- Có bridge scenes = ${addBridgeScenes} ✓
+- Không có text/công thức = ${hideFormulas} ✓
+- Continuity chặt chẽ = ${ensureContinuity} ✓
 
-✅ TỔNG KẾT CHUẨN XUẤT (tạo bảng tóm tắt cuối storyboard):
-
-| Thành phần | Chuẩn tối thiểu | Ghi chú |
-|------------|----------------|---------|
-| Số cảnh | ${sceneStructure} | ${addBridgeScenes ? 'Giữ continuity mượt giữa các vị trí' : 'Giữ nhịp độ đều'} |
-| Âm thanh | [Mô tả âm thanh phù hợp] | Không nhạc nền trong cảnh học |
-| Font chữ | ${hideFormulas ? '❌ Không xuất hiện' : 'Nếu có, dùng không dấu'} | ${hideFormulas ? 'Toàn bộ qua thoại' : 'Font sans-serif rõ ràng'} |
-| Công thức toán học | ${hideFormulas ? '❌ Không xuất hiện' : 'Có thể xuất hiện'} | ${hideFormulas ? 'Được diễn đạt qua thoại' : 'Hiển thị rõ ràng'} |
-| Lighting & color | ${ensureContinuity ? 'Đồng nhất sáng ấm' : 'Linh hoạt theo cảnh'} | ${ensureContinuity ? 'Không thay đổi LUT giữa cảnh' : 'Phù hợp từng cảnh'} |
-| Transition logic | ${ensureContinuity ? 'Giữ hướng di chuyển trái → phải' : 'Tự nhiên'} | ${ensureContinuity ? 'Nhân vật không "teleport"' : 'Mượt mà'} |
-| Kết nối cảm xúc | Tò mò → hợp tác → hiểu bài → vui vẻ | Thống nhất biểu cảm xuyên suốt |
-
-Hãy tạo storyboard theo ĐÚNG format trên!`;
+HÃY TẠO STORYBOARD TUÂN THEO ĐÚNG CẤU HÌNH TRÊN!`;
 
         event.sender.send('progress-update', { progress: 30, status: 'Đang gửi yêu cầu tới AI...' });
 
@@ -752,30 +732,50 @@ CRITICAL: Apply CONSISTENCY CONTROLS for AI video generation (Veo 3, Sora 2, Run
         }
 
         // Calculate scenes and duration based on user input
-        const durationMinutes = parseInt(duration || wordCount / 500 || 2); // duration in minutes
-        const totalSeconds = durationMinutes * 60;
+        // ~200 words per main scene (Vietnamese reading speed)
+        // Each main scene = ~10 seconds
+        const wordsPerScene = 200;
         const mainSceneDuration = 10; // seconds per main scene
         const bridgeSceneDuration = 3; // seconds per bridge scene
 
-        let numMainScenes, numBridgeScenes, sceneStructure, totalDuration;
+        // Get final word count from duration or url input
+        const finalWordCount = duration ? parseInt(duration) : (wordCount || 1000);
+
+        // Calculate number of main scenes based on word count
+        const numMainScenes = Math.max(3, Math.round(finalWordCount / wordsPerScene));
+
+        let numBridgeScenes, sceneStructure, totalDuration;
 
         if (addBridgeScenes) {
             // Calculate with bridge scenes
-            numMainScenes = Math.floor((totalSeconds * 2) / (mainSceneDuration * 2 + bridgeSceneDuration));
             numBridgeScenes = Math.max(0, numMainScenes - 1);
             const actualDuration = (numMainScenes * mainSceneDuration) + (numBridgeScenes * bridgeSceneDuration);
             sceneStructure = `${numMainScenes + numBridgeScenes} cảnh (${numMainScenes} chính + ${numBridgeScenes} bridge)`;
             totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         } else {
             // Calculate without bridge scenes
-            numMainScenes = Math.floor(totalSeconds / mainSceneDuration);
             numBridgeScenes = 0;
             const actualDuration = numMainScenes * mainSceneDuration;
-            sceneStructure = `${numMainScenes} cảnh chính`;
+            sceneStructure = `${numMainScenes} cảnh`;
             totalDuration = `~${actualDuration}s (~${Math.round(actualDuration / 60 * 10) / 10} phút)`;
         }
 
         const sourceLabel = sourceType === 'file' ? `file ${fileName}` : 'bài viết';
+
+        // Build advanced options description
+        let advancedOptions = '';
+
+        if (addBridgeScenes) {
+            advancedOptions += '\n📍 CÓ CẢH BRIDGE: Thêm cảnh chuyển động tự nhiên giữa các cảnh chính để liên kết mượt mà.';
+        }
+
+        if (hideFormulas) {
+            advancedOptions += '\n🚫 CẤM TEXT/CÔNG THỨC: TUYỆT ĐỐI KHÔNG hiển thị chữ/số/công thức trên màn hình. Thay bằng:\n   • Biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay)\n   • THOẠI DÀI, CHI TIẾT từ nhân vật giải thích\n   • Hành động trực quan từ nhân vật';
+        }
+
+        if (ensureContinuity) {
+            advancedOptions += '\n🔗 ĐẢM BẢO CONTINUITY CHẶT CHẼ:\n   • Ánh sáng 5200K không thay đổi (không vàng, không lạnh)\n   • Hướng bóng đổ nhất quán từ trái qua phải\n   • Vị trí nhân vật không "teleport" giữa các cảnh\n   • Props (bàn, ghế, đồ dùng) ở cùng vị trí\n   • Không cắt ngang hành động của nhân vật';
+        }
 
         // Build content section with optional urlIdea
         let contentSection = `Nội dung ${sourceLabel}:
@@ -795,20 +795,25 @@ ${contentSection}
 ${stylePrompt}
 ${customInstructions ? `\nYêu cầu bổ sung: ${customInstructions}` : ''}
 
+⚙️ CẤU HÌNH:${advancedOptions}
+
 📋 CHUẨN STORYBOARD XUẤT:
 
-**Yêu cầu:**
-1. Phân tích nội dung chính của bài viết
-2. Tạo ${sceneStructure} (mỗi cảnh chính 10s, cảnh bridge 3s, tổng ${totalDuration})
-3. 3 giây cuối mỗi cảnh chính: freeze frame để chèn text overlay
-4. ${hideFormulas ? '⛔ CRITICAL - ABSOLUTE BAN: KHÔNG text/số/công thức trên màn hình. VÍ DỤ SAI: "2/3 - (1/2 + 1/3)" viết trên bảng → AI render sai. ĐÚNG: Nhân vật nói "hai phần ba trừ một nửa cộng một phần ba" và chỉ vào bảng trống/vật thể trực quan. Toàn bộ qua THOẠI DÀI, CHI TIẾT + HÀNH ĐỘNG TRỰC QUAN.' : 'Có thể có text/công thức nếu cần'}
-5. ⚠️ THOẠI PHẢI DÀI, CHI TIẾT: Giải thích đầy đủ như giáo viên thực tế, không lo thoại dài (người dùng ghép thoại sau), ưu tiên giúp người nghe hiểu rõ nội dung
-6. Mô tả: nhân vật (đeo khăn quàng đỏ), bối cảnh, camera, ánh sáng, hành động
-7. Beat plan chi tiết cho mỗi cảnh
-8. ${ensureContinuity ? 'Đảm bảo continuity: ánh sáng đồng nhất, hướng camera nhất quán, không teleport nhân vật' : 'Chuyển cảnh tự nhiên'}
-9. Phù hợp học sinh THCS/THPT Việt Nam
-10. ⚠️ LƯU Ý QUAN TRỌNG: AI video generators (Veo 3, Sora 2, Runway Gen-3) LUÔN render sai các công thức toán học và chữ số. Thay vào đó, sử dụng biểu diễn trực quan (thanh phân số, hình khối, đếm bằng ngón tay/vật thể) và THOẠI DÀI, CHI TIẾT để giải thích.
-11. 🎙️ ĐẦU TƯ THOẠI: Mỗi đoạn thoại phải dài, đầy đủ, giải thích kỹ càng như giáo viên thực tế đang giảng bài. Bao gồm: giới thiệu chủ đề → giải thích khái niệm → đưa ra ví dụ → phân tích → kết luận. Không giới hạn độ dài thoại.
+**Yêu cầu chính:**
+1. ⚠️ Tạo ĐÚNG ${numMainScenes} cảnh chính - không được nhiều hơn, không được ít hơn
+${addBridgeScenes ? `2. Thêm ${numBridgeScenes} cảnh bridge (chuyển động tự nhiên giữa các cảnh chính)` : `2. KHÔNG thêm cảnh bridge - chỉ cảnh chính`}
+3. Mỗi cảnh chính: ~10 giây, hành động cụ thể + thoại rõ ràng (tổng ${totalDuration})
+${hideFormulas ? `4. 🚫 TUYỆT ĐỐI không viết chữ/số/công thức trên màn hình - dùng biểu diễn trực quan + thoại dài` : `4. Có thể hiển thị text/công thức nếu cần thiết`}
+${ensureContinuity ? `5. Đảm bảo continuity: ánh sáng (5200K), bóng đổ, vị trí nhân vật, props không đổi giữa các cảnh` : `5. Chuyển cảnh tự nhiên`}
+6. Phân tích nội dung: tìm điểm chính, chia thành ${numMainScenes} phần hợp lý
+7. Mô tả: nhân vật (đeo khăn quàng đỏ), bối cảnh, camera, ánh sáng, hành động, beat plan
+8. Thoại: Dài, chi tiết, giải thích kỹ càng như giáo viên thực tế
+
+🚨 KIỂM TRA LẠI:
+- Số cảnh chính = ${numMainScenes} ✓
+- Có bridge scenes = ${addBridgeScenes} ✓
+- Không có text/công thức = ${hideFormulas} ✓
+- Continuity chặt chẽ = ${ensureContinuity} ✓
 
 **Format Header:**
 🎬 CHUẨN STORYBOARD – "[Tiêu đề]"
@@ -1003,6 +1008,75 @@ ipcMain.handle('import-prompts-from-file', async () => {
         }
     }
     return null;
+});
+
+// ============================================
+// VIDEO MERGING - Concatenate video files
+// ============================================
+
+ipcMain.handle('merge-videos', async (event, { videoPaths, outputPath, outputFileName }) => {
+    const { execSync } = require('child_process');
+
+    try {
+        // Validate inputs
+        if (!videoPaths || videoPaths.length === 0) {
+            throw new Error('No video paths provided');
+        }
+
+        if (!outputPath) {
+            throw new Error('Output path not specified');
+        }
+
+        // Create output directory if it doesn't exist
+        if (!fs.existsSync(outputPath)) {
+            fs.mkdirSync(outputPath, { recursive: true });
+        }
+
+        // Use provided filename or generate one
+        const finalFileName = outputFileName || `merged_video_${Date.now()}.mp4`;
+        const finalOutputPath = path.join(outputPath, finalFileName);
+
+        console.log(`[Merge Videos] Merging ${videoPaths.length} videos...`);
+        console.log(`[Merge Videos] Input videos: ${videoPaths.join(', ')}`);
+        console.log(`[Merge Videos] Output: ${finalOutputPath}`);
+
+        // Create concat file for FFmpeg
+        const concatFilePath = path.join(outputPath, `concat_${Date.now()}.txt`);
+        const concatContent = videoPaths
+            .map(videoPath => `file '${videoPath.replace(/\\/g, '\\\\')}'`)
+            .join('\n');
+
+        fs.writeFileSync(concatFilePath, concatContent);
+        console.log(`[Merge Videos] Concat file created: ${concatFilePath}`);
+
+        // Run FFmpeg to merge videos
+        const ffmpegCommand = `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy -y "${finalOutputPath}"`;
+
+        console.log(`[Merge Videos] Running FFmpeg command...`);
+        execSync(ffmpegCommand, { stdio: 'inherit' });
+
+        console.log(`[Merge Videos] ✅ Videos merged successfully: ${finalOutputPath}`);
+
+        // Clean up concat file
+        try {
+            fs.unlinkSync(concatFilePath);
+        } catch (err) {
+            console.warn(`[Merge Videos] Warning: Could not delete concat file: ${err.message}`);
+        }
+
+        return {
+            success: true,
+            outputPath: finalOutputPath,
+            message: `Merged ${videoPaths.length} videos successfully`
+        };
+
+    } catch (error) {
+        console.error('[Merge Videos] Error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 });
 
 // ============================================
@@ -1627,12 +1701,12 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
         // Use selected model with fallback to default
         const modelToUse = selectedModel || "gemini-2.5-flash-lite";
 
-        // CRITICAL: Max output tokens to prevent truncation for long storyboards
+        // Optimized: Use moderate token limit for concise output
         const model = genAI.getGenerativeModel({
             model: modelToUse,
             generationConfig: {
-                maxOutputTokens: 65536,  // Maximum for Gemini 2.5 models (was 8192 - caused truncation)
-                temperature: 0.7,
+                maxOutputTokens: 16384,  // Optimized for concise, efficient prompts
+                temperature: 0.6,  // Lower temp for more focused output
             }
         });
 
@@ -1645,198 +1719,69 @@ ipcMain.handle('generate-structured-prompts', async (event, { storyboard, apiKey
 
         const systemPrompt = `You are an expert video prompt creator for educational videos.
 
-**Task:** Generate structured video prompts following this EXACT format.
+**BẮTBUỘC - OUTPUT FORMAT WITH EXACT STRUCTURE:**
 
-**INPUT:** You will receive a storyboard with scenes, characters, and story details.
-
-📊 QUAN TRỌNG - CHIA CẢNH THEO THOẠI:
-- Mỗi prompt video chỉ tạo được ~8 giây
-- Tốc độ đọc tiếng Việt tự nhiên: ~2.5-3 từ/giây
-- Nếu thoại trong 1 cảnh > 20-25 từ → PHẢI CHIA thành nhiều prompt con
-- Ví dụ: Cảnh 1 có thoại 60 từ → Chia thành Cảnh 1.1, 1.2, 1.3 (mỗi prompt ~20 từ)
-- Các prompt con phải liên tục về hình ảnh và nội dung
-- Nhân vật giữ nguyên tư thế, biểu cảm trong các prompt con của cùng 1 cảnh
-
-**OUTPUT FORMAT:**
-
-First, generate SETTING CHUNG (general settings) - generated ONCE:
+First, generate ONCE at the beginning:
 
 🧱 SETTING CHUNG
 
-Phong cách: Video hoạt hình 3D Pixar, tông màu ấm, phù hợp giáo dục học sinh VN.
+Phong cách: 3D Pixar animation (KHÔNG người thật, KHÔNG live-action)
 
-Địa điểm: [Lấy từ storyboard - lớp học/sân trường VN]
-
-Nhân vật chính:
-  [Tên nhân vật]: 
-    - Tuổi [12-14 tuổi], học sinh VN
-    - Khuôn mặt [tròn/oval], mắt [đen/nâu], da [sáng/ngăm], nụ cười [tươi/hiền]
-    - Tóc đen [ngắn gọn/dài vai, thẳng/xoăn]
-    - Mặc đồng phục: áo trắng, quần [xanh navy/váy], khăn đỏ
-    - Tính cách: [tò mò/nhiệt tình/trầm tính]
-    ⚠️ Giữ nguyên hình dáng nhân vật này trong TẤT CẢ các cảnh
+Nhân vật:
+  [Tên]: [Age], [Khuôn mặt], [Mắt], [Tóc], [Trang phục], [Tính cách]
+  [Reference tag: [Name]_consistent - GIỮ NGUYÊN TRONG MỌI CẢNH]
 
 Bối cảnh:
-  - Lớp học sáng sủa, ánh sáng tự nhiên từ cửa sổ bên trái
-  - Bàn ghế gỗ, bảng đen/trắng, cây xanh ngoài cửa sổ
-  - Không khí ấm áp, thân thiện
-  - Âm thanh nhẹ: giấy viết, bút chì, tiếng chim
+  - Lớp học Việt Nam, ánh sáng tự nhiên 5200K
+  - Props: [Những đồ vật cấp thiết]
+  - Màu sắc: Ấm, thân thiện
+  - Âm thanh: Ambient nhẹ (KHÔNG nhạc nền)
 
-Góc quay: Nhìn thẳng hoặc từ trên xuống (khi vẽ hình), ổn định, không rung lắc.
-
-⛔ LƯU Ý QUAN TRỌNG: 
-  • KHÔNG hiển thị chữ/số/công thức (AI không render đúng)
-  • Thay bằng vật thể hình ảnh + nhân vật nói
-  • 🗣️ THOẠI BẮT BUỘC BẰNG TIẾNG VIỆT - Giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
-
-🎭 QUY TẮC XỬ LÝ NHÂN VẬT THOẠI:
-  • Nếu scene chỉ có 1 nhân vật thoại: Nhân vật còn lại phải có biểu cảm lắng nghe chăm chú, gật đầu, mỉm cười, hoặc im lặng quan sát
-  • KHÔNG BAO GIỜ để nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
-  • Nhân vật lắng nghe: Mắt nhìn vào người nói, tư thế chú ý, có thể gật đầu nhẹ hoặc mỉm cười đồng tình
-  • Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
-
-Thời lượng mỗi cảnh: 10 giây
+⚠️ QUAN TRỌNG:
+  - KHÔNG hiển thị text/số/công thức trên màn hình
+  - Dùng biểu diễn trực quan + thoại chi tiết
 
 ---
 
-Then, for EACH scene in storyboard, analyze dialogue length and generate:
+Then for EACH scene, use this EXACT structure:
 
-**BƯỚC 1: Phân tích thoại**
-- Đếm số từ trong thoại của cảnh
-- Nếu ≤ 25 từ: Tạo 1 prompt (Scene X)
-- Nếu 26-50 từ: Tạo 2 prompts (Scene X.1, X.2)  
-- Nếu 51-75 từ: Tạo 3 prompts (Scene X.1, X.2, X.3)
-- Nếu > 75 từ: Tạo 4+ prompts tương ứng
+🎞️ PROMPT Scene [#]
 
-**BƯỚC 2: Chia thoại hợp lý**
-- Chia theo câu hoàn chỉnh (không cắt giữa câu)
-- Mỗi đoạn ~20-25 từ (để đủ 8 giây video)
-- Đảm bảo ý nghĩa liên tục giữa các đoạn
-
-**BƯỚC 3: Tạo prompt cho mỗi đoạn**
-
-🎞️ Scene [số].[sub] (nếu có nhiều prompt con, VD: 1.1, 1.2, 1.3)
-
-Mục đích: [Học sinh sẽ hiểu/học được gì - CHỈ GHI Ở PROMPT ĐẦU TIÊN của cảnh]
+Mục đích: [Học sinh sẽ học được gì]
 
 Mô tả cảnh:
-  - Nhân vật: [Tên - với đặc điểm như đã mô tả trong SETTING CHUNG]
-  - Bối cảnh: [Ở đâu, có gì xung quanh - GIỐNG NHAU cho các prompt con]
-  - Vật dụng: [Sách, bút, hình vẽ, mô hình...]
-  - 🔗 [Nếu là prompt con thứ 2+] Tiếp nối từ Scene [số].[sub-1]
+  - Nhân vật: [Tên - lấy từ SETTING CHUNG]
+  - Bối cảnh: [Chi tiết vị trí, props]
+  - Liên kết: [Tiếp từ scene trước nếu có]
 
-Diễn biến (8 giây):
-  • Giây 0-2: [Nhân vật tiếp tục từ tư thế trước (nếu là prompt con) hoặc bắt đầu mới]
-  • Giây 2-6: [Nói thoại đoạn này - nhân vật giữ nguyên tư thế, chỉ miệng động]
-  • Giây 6-8: [Kết thúc đoạn thoại - chờ prompt tiếp theo HOẶC chuyển cảnh]
+Diễn biến (0-10s):
+  • 0-3s: [Hành động 1]
+  • 3-7s: [Hành động 2 + thoại]
+  • 7-10s: [Kết thúc cảnh]
 
-Hành động nhân vật: [Mô tả chi tiết cử chỉ, nét mặt, tương tác với vật]
+Camera: [Loại shot + hướng di chuyển]
 
-🎭 BIỂU CẢM NHÂN VẬT KHÔNG THOẠI:
-- Nếu có nhân vật không nói trong scene: Mô tả biểu cảm lắng nghe chăm chú
-- Ví dụ: "Nhân vật B ngồi im lặng, mắt nhìn chăm chú vào nhân vật A, gật đầu nhẹ khi hiểu, mỉm cười đồng tình"
-- KHÔNG BAO GIỜ: "Nhân vật B mở miệng như đang nói" hoặc "Nhân vật B có biểu cảm như đang phát biểu"
-- Luôn nhấn mạnh: Nhân vật im lặng = biểu cảm lắng nghe, không phải biểu cảm nói
+Hành động: [Chi tiết cử chỉ, biểu cảm nhân vật]
 
-Góc quay: [Nhìn từ đâu, có di chuyển máy không]
+Thoại (Tiếng Việt tự nhiên):
+  [Tên nhân vật]: "[${enableDialogueSeconds ? `~${Math.floor(Number(dialogueSeconds) * 2.5)}-${Math.floor(Number(dialogueSeconds) * 3)} từ` : '~20-25 từ'}]"
+  [Nhân vật khác nếu im lặng]: [Mô tả biểu cảm lắng nghe - KHÔNG thoại]
 
-Không khí: [Vui vẻ/tập trung/phấn khởi/...]
+Không khí: [Tòng cảm xúc]
 
-Ánh sáng: Giữ sáng tự nhiên từ cửa sổ bên trái như SETTING CHUNG
-
-⚠️ Nhắc nhở: Không có chữ/số hiện trên màn hình. Chỉ dùng hình ảnh và lời nói.
-
-Chuyển cảnh: [Mượt mà sang cảnh tiếp theo như thế nào]
-
-Thoại (🗣️ BẮT BUỘC TIẾNG VIỆT - ~20-25 từ cho prompt này - giọng đọc tự nhiên, rõ ràng):
-  [Tên nhân vật]: "[CHỈ phần thoại cho prompt này - khoảng 20-25 từ - đủ cho 8 giây video]"
-  
-  🎭 NHÂN VẬT KHÔNG THOẠI:
-  - [Tên nhân vật 2]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
-  - [Tên nhân vật 3]: [Biểu cảm lắng nghe chăm chú/quan tâm/đồng tình - KHÔNG có thoại]
-  
-💡 VÍ DỤ CHIA THOẠI:
-- Thoại gốc (60 từ): "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa. Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu. Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?"
-
-- Scene 1.1: 
-  * Vy: "Bảo ơi, mình để ý thấy xung quanh mình có rất nhiều đồ vật với hình dáng khác nhau, từ cái bàn, cái cửa sổ cho đến cả mảnh vườn nhỏ nữa." (25 từ)
-  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
-
-- Scene 1.2: 
-  * Vy: "Mấy hình đó đôi khi phức tạp lắm, không phải lúc nào cũng là hình vuông hay hình chữ nhật đơn giản đâu." (21 từ)
-  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
-
-- Scene 1.3: 
-  * Vy: "Vì vậy, mình muốn hỏi bạn là, trong thực tế, khi gặp những hình dạng phức tạp như vậy, chúng ta có cách nào để tính chu vi và diện tích của chúng không nhỉ?" (33 từ - có thể chia tiếp nếu cần)
-  * Bảo: Biểu cảm lắng nghe chăm chú, gật đầu đồng tình - KHÔNG có thoại
-
-⚠️ QUAN TRỌNG: 
-- Toàn bộ thoại phải bằng TIẾNG VIỆT, không dùng tiếng Anh
-- Mỗi prompt chỉ chứa 1 ĐOẠN NGẮN của thoại (20-25 từ)
-- Các prompt con (1.1, 1.2, 1.3) ghép lại = thoại đầy đủ của cảnh gốc
-
-🎭 LƯU Ý VỀ NHÂN VẬT THOẠI:
-- Chỉ nhân vật được chỉ định mới có thoại trong prompt này
-- Nhân vật còn lại: Biểu cảm lắng nghe chăm chú TRONG TẤT CẢ các prompt con
-- Giữ nguyên tư thế, biểu cảm lắng nghe xuyên suốt các prompt con của cùng 1 cảnh
-- BẮT BUỘC ghi rõ trong phần "NHÂN VẬT KHÔNG THOẠI" để AI hiểu rõ ai không nói
-- Tránh tình trạng nhân vật "nói nhầm" thoại của nhau
+Transition: [Chuyển sang cảnh tiếp]
 
 ---
 
-**YÊU CẦU QUAN TRỌNG:**
+**BẮT BUỘC TUÂN THỦ:**
+1. Luôn bắt đầu bằng: 🧱 SETTING CHUNG (chỉ 1 lần)
+2. Sau đó các cảnh: 🎞️ PROMPT Scene # (mỗi cảnh riêng biệt)
+3. Thoại: Toàn bộ TIẾNG VIỆT, tự nhiên, rõ ràng
+4. Nhân vật im lặng: Mô tả biểu cảm lắng nghe - KHÔNG mở miệng như nói
+5. Chia cảnh nếu thoại dài: Scene 1.1, 1.2, 1.3 (mỗi ~20 từ)
+6. Xử lý HẾT SỰ các cảnh trong storyboard - KHÔNG được dừng giữa chừng
 
-1. Format output: Text thường với tiêu đề emoji (🧱 🎞️), KHÔNG dùng JSON
-
-2. SETTING CHUNG viết 1 lần duy nhất ở đầu
-
-3. ⚠️ BẮT BUỘC: Phải xử lý TẤT CẢ các cảnh trong storyboard
-   - VD: Storyboard có 12 cảnh → Phải xử lý đủ 12 cảnh
-   - Mỗi cảnh CÓ THỂ tạo nhiều prompt con nếu thoại dài
-   - VD: Cảnh 1 (60 từ) → Scene 1.1, 1.2, 1.3
-   - VD: Cảnh 2 (20 từ) → Scene 2 (chỉ 1 prompt)
-   - TỔNG SỐ PROMPT có thể > số cảnh gốc (do chia nhỏ)
-   - KHÔNG được dừng giữa chừng!
-
-3b. 📊 QUY TẮC CHIA CẢNH THÀNH PROMPT:
-   - Đọc thoại của cảnh trong storyboard
-   - Đếm số từ trong thoại
-   - Nếu ≤ 25 từ: 1 prompt (Scene X)
-   - Nếu 26-50 từ: 2 prompts (Scene X.1, X.2)
-   - Nếu 51-75 từ: 3 prompts (Scene X.1, X.2, X.3)
-   - Nếu > 75 từ: 4+ prompts
-   - Chia thoại theo câu hoàn chỉnh, mỗi đoạn ~20-25 từ
-   - Các prompt con giữ nguyên hình ảnh, chỉ khác thoại
-
-4. Ngôn ngữ & Thoại:
-   - Tất cả nội dung bằng TIẾNG VIỆT
-   - Thoại: 🗣️ BẮT BUỘC TIẾNG VIỆT - giọng đọc tự nhiên, rõ ràng, chậm rãi, phù hợp học sinh VN
-   - Không dùng tiếng Anh trong thoại
-   - Giải thích chi tiết, dễ hiểu${enableDialogueSeconds && Number(dialogueSeconds) > 0 ? `\n   - ⏱️ QUAN TRỌNG: Viết thoại đủ dài để đọc trong ${Number(dialogueSeconds)} giây (khoảng ${Math.floor(Number(dialogueSeconds) * 2.5)}-${Math.floor(Number(dialogueSeconds) * 3)} từ tiếng Việt)` : ''}
-
-5. 🎭 XỬ LÝ NHÂN VẬT THOẠI:
-   - Nếu scene có 2+ nhân vật nhưng chỉ 1 người nói: Nhân vật còn lại PHẢI có biểu cảm lắng nghe
-   - Biểu cảm lắng nghe: Mắt nhìn chăm chú, gật đầu, mỉm cười, tư thế chú ý
-   - TUYỆT ĐỐI KHÔNG: Nhân vật im lặng có biểu cảm như đang nói hoặc mở miệng
-   - Mục đích: Tránh lỗi AI render nhầm thoại cho nhân vật sai
-
-6. Mô tả nhân vật phải chi tiết:
-   - Tuổi, khuôn mặt (tròn/oval/vuông)
-   - Mắt (màu, to/nhỏ), mũi, miệng (nụ cười)
-   - Tóc (kiểu, màu, dài/ngắn)
-   - Trang phục cụ thể (áo trắng, quần xanh, khăn đỏ)
-   → Đủ chi tiết để AI vẽ giống hệt nhau ở MỌI cảnh
-
-7. Giữ nhất quán:
-   - Nhân vật: Khuôn mặt, tóc, trang phục GIỐNG HỆT mọi cảnh
-   - Bối cảnh: Lớp học, bàn ghế, ánh sáng GIỐNG NHAU
-   - Âm thanh: Không đổi
-
-8. ⛔ TUYỆT ĐỐI KHÔNG có chữ/số/công thức trên màn hình:
-   - Lý do: AI video không vẽ đúng chữ số
-   - Giải pháp: Dùng vật thể hình ảnh + nhân vật nói
-
-9. Phong cách: Video 3D Pixar - mềm mại, biểu cảm, màu sắc ấm${dialogueDurationNote}`;
+${dialogueDurationNote}`;
 
         const userPrompt = `Generate structured video prompts for this storyboard:\n\n${JSON.stringify(storyboard, null, 2)}`;
 
@@ -2740,7 +2685,7 @@ ipcMain.handle('start-veo3-automation', async (event, { prompts, cookieString, v
                     // 4.5.3: Click "+" (add) button
                     logMessage(prompt.id, 'Dang click nut "+" de them khung hinh...', 'processing');
                     await page.evaluate(() => {
-                        const button = document.evaluate('/html/body/div[1]/div[2]/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/div/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        const button = document.evaluate('/html/body/div/div[2]/div/div/div[2]/div/div[1]/div[2]/div/div/div[2]/div[1]/div/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
                         if (button) {
                             button.click();
                             console.log('[Veo3] Clicked "+" add button via XPath');

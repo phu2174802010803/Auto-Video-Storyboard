@@ -58,11 +58,22 @@ const StoryCreator = () => {
         return preset ? preset.words : parseInt(dur); // Direct word count for custom
     };
 
+    // Get duration in minutes and seconds for display
+    const getDurationDisplay = (wordCount) => {
+        const minutes = Math.round(wordCount / 200); // ~200 words per minute for Vietnamese
+        const seconds = (minutes % 1) * 60;
+        if (minutes >= 1) {
+            return `~${Math.floor(minutes)}m ${Math.round(seconds)}s`;
+        }
+        return `~${Math.round(wordCount / 200 * 60)}s`;
+    };
+
     const finalDuration = duration === 'custom' ? customDuration : duration;
     const finalWordCount = duration === 'custom'
         ? parseInt(customDuration) || 1000
         : getWordCountFromDuration(duration);
     const finalStyle = style === '✨ Tùy chỉnh' ? customStyle : style;
+    const durationDisplay = getDurationDisplay(finalWordCount);
 
     // Save to localStorage whenever state changes
     useEffect(() => {
@@ -609,26 +620,31 @@ const StoryCreator = () => {
 
                     <div className="input-row">
                         <div className="input-group">
-                            <label>📊 Độ dài storyboard (số từ)</label>
+                            <label>📊 Độ dài Storyboard</label>
                             <select value={duration} onChange={(e) => setDuration(e.target.value)}>
                                 {VIDEO_DURATION_PRESETS.map(preset => (
                                     <option key={preset.value} value={preset.value}>{preset.label}</option>
                                 ))}
-                                <option value="custom">⚙️ Tùy chỉnh</option>
+                                <option value="custom">⚙️ Tùy chỉnh (nhập số từ)</option>
                             </select>
                             {duration === 'custom' && (
-                                <input
-                                    type="number"
-                                    value={customDuration}
-                                    onChange={(e) => setCustomDuration(e.target.value)}
-                                    placeholder="Nhập số từ (500-30000)"
-                                    min="500"
-                                    max="30000"
-                                    className="custom-input"
-                                />
+                                <>
+                                    <input
+                                        type="number"
+                                        value={customDuration}
+                                        onChange={(e) => setCustomDuration(e.target.value)}
+                                        placeholder="Nhập số từ (200-5000 được khuyến nghị)"
+                                        min="200"
+                                        max="30000"
+                                        className="custom-input"
+                                    />
+                                    <p className="input-hint">
+                                        💡 Gợi ý: 300-500 từ (video ngắn), 800-1000 từ (chuẩn), 1500-2000 từ (dài)
+                                    </p>
+                                </>
                             )}
                             <p className="input-hint">
-                                📊 Độ dài storyboard: ~{finalWordCount} từ
+                                ⏱️ Độ dài tương ứng: {finalWordCount} từ - {durationDisplay}
                             </p>
                         </div>
 
